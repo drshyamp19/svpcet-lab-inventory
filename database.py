@@ -1,7 +1,21 @@
 import sqlite3
 import os
+import shutil
 
-DB_PATH = os.path.join(os.path.dirname(__file__), 'lab_inventory.db')
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# On Vercel Serverless, the root directory is READ-ONLY.
+# Writable files (like SQLite database) must be placed in /tmp.
+if os.environ.get('VERCEL'):
+    DB_PATH = '/tmp/lab_inventory.db'
+    bundled_db = os.path.join(BASE_DIR, 'lab_inventory.db')
+    if not os.path.exists(DB_PATH) and os.path.exists(bundled_db):
+        try:
+            shutil.copyfile(bundled_db, DB_PATH)
+        except Exception as e:
+            print(f"Notice: Could not copy initial DB to /tmp: {e}")
+else:
+    DB_PATH = os.path.join(BASE_DIR, 'lab_inventory.db')
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
