@@ -1,0 +1,1113 @@
+{% extends "base.html" %}
+
+{% block title %}IN / OUT (Issue & Return) - Embedded Systems Lab | SVPCET{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-6">
+        <h2 class="fw-bold mb-1"><i class="fa-solid fa-arrow-right-arrow-left text-primary me-2"></i>IN / OUT (Issue & Return)</h2>
+        <p class="text-muted mb-0">{{ active_lab.lab_name if active_lab else 'Laboratory' }} — Equipment Issue & Return tracking with instant WhatsApp receipts.</p>
+    </div>
+    <div class="col-md-6 text-md-end mt-3 mt-md-0 d-flex flex-wrap gap-2 justify-content-md-end">
+        <a href="{{ url_for('transaction_report') }}" target="_blank" class="btn btn-outline-dark btn-custom shadow-sm">
+            <i class="fa-solid fa-print me-1"></i> Print Report / PDF
+        </a>
+        <button class="btn btn-primary btn-custom shadow-sm" data-bs-toggle="modal" data-bs-target="#issueModal">
+            <i class="fa-solid fa-hand-holding-hand me-1"></i> Issue Component (OUT)
+        </button>
+    </div>
+</div>
+
+<!-- Filter Tabs (Status & Recipient Type) -->
+<div class="card mb-4 p-2 bg-white">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <!-- Status Tabs -->
+        <ul class="nav nav-pills">
+            <li class="nav-item">
+                <a class="nav-link {% if not selected_status %}active{% endif %}" href="{{ url_for('list_transactions', recipient_type=selected_recipient) }}">
+                    All Transactions
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if selected_status == 'ISSUED' %}active bg-warning text-dark{% endif %}" href="{{ url_for('list_transactions', status='ISSUED', recipient_type=selected_recipient) }}">
+                    <i class="fa-solid fa-clock me-1"></i> Pending Returns
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if selected_status == 'RETURNED' %}active bg-success{% endif %}" href="{{ url_for('list_transactions', status='RETURNED', recipient_type=selected_recipient) }}">
+                    <i class="fa-solid fa-circle-check me-1"></i> Returned (Good)
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if selected_status == 'ISSUES' %}active bg-danger{% endif %}" href="{{ url_for('list_transactions', status='ISSUES', recipient_type=selected_recipient) }}">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Damaged & Missing
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if selected_status == 'CONSUMED' %}active bg-secondary{% endif %}" href="{{ url_for('list_transactions', status='CONSUMED', recipient_type=selected_recipient) }}">
+                    <i class="fa-solid fa-box-open me-1"></i> Consumed
+                </a>
+            </li>
+        </ul>
+
+        <!-- Recipient Type Filter Badges -->
+        <div class="btn-group btn-group-sm">
+            <a href="{{ url_for('list_transactions', status=selected_status) }}" class="btn {% if not selected_recipient %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+                All
+            </a>
+            <a href="{{ url_for('list_transactions', status=selected_status, recipient_type='STUDENT') }}" class="btn {% if selected_recipient == 'STUDENT' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                <i class="fa-solid fa-user-graduate me-1"></i> Students
+            </a>
+            <a href="{{ url_for('list_transactions', status=selected_status, recipient_type='STAFF') }}" class="btn {% if selected_recipient == 'STAFF' %}btn-success{% else %}btn-outline-success{% endif %}">
+                <i class="fa-solid fa-chalkboard-user me-1"></i> Faculty / Staff
+            </a>
+            <a href="{{ url_for('list_transactions', status=selected_status, recipient_type='OTHER_LAB') }}" class="btn {% if selected_recipient == 'OTHER_LAB' %}btn-warning text-dark{% else %}btn-outline-warning text-dark{% endif %}">
+                <i class="fa-solid fa-flask-vial me-1"></i> Other Labs
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Live Search Filter Bar -->
+<div class="card mb-3 p-3 bg-white border shadow-sm">
+    <div class="row g-2 align-items-center">
+        <div class="col-md-7">
+            <div class="input-group">
+                <span class="input-group-text bg-light text-primary border-end-0">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                </span>
+                <input type="text" id="txnLiveSearch" class="form-control border-start-0" 
+                       placeholder="Type here to live filter: Staff Name, Lab Name, Student UID, Item..."
+                       value="{{ search }}">
+                {% if search %}
+                    <a href="{{ url_for('list_transactions', status=selected_status, recipient_type=selected_recipient) }}" class="btn btn-outline-secondary" title="Reset Search">
+                        <i class="fa-solid fa-xmark"></i>
+                    </a>
+                {% else %}
+                    <button class="btn btn-outline-secondary" type="button" id="clearSearchBtn" title="Clear Search" style="display: none;">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-5 text-md-end text-muted small">
+            <span id="filteredCountBadge" class="badge bg-light text-dark border px-2 py-1">
+                Showing all {{ transactions|length }} transactions
+            </span>
+        </div>
+    </div>
+</div>
+
+<!-- Transactions Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date & Time</th>
+                        <th>Issued To (Recipient & Mobile)</th>
+                        <th>Component</th>
+                        <th>Issued Qty</th>
+                        <th>Purpose / Remarks</th>
+                        <th>Return Status & Breakdown</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="transactionsTableBody">
+                    {% for t in transactions %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold text-dark">{{ t.transaction_date.split()[0] if t.transaction_date else '' }}</div>
+                            <small class="text-muted">{{ t.transaction_date.split()[1][:5] if t.transaction_date and ' ' in t.transaction_date else '' }}</small>
+                        </td>
+                        <td>
+                            <!-- Recipient Type Badge -->
+                            {% if t.display_type == 'STAFF' %}
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-0 mb-1">
+                                    <i class="fa-solid fa-chalkboard-user me-1"></i>Faculty / Staff
+                                </span>
+                            {% elif t.display_type == 'OTHER_LAB' %}
+                                <span class="badge bg-warning bg-opacity-10 text-dark border border-warning px-2 py-0 mb-1">
+                                    <i class="fa-solid fa-flask-vial me-1"></i>Other Lab
+                                </span>
+                            {% else %}
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary px-2 py-0 mb-1">
+                                    <i class="fa-solid fa-user-graduate me-1"></i>Student
+                                </span>
+                            {% endif %}
+
+                            <div class="fw-bold text-dark">{{ t.display_name }}</div>
+                            {% if t.display_id_code %}
+                                <small class="text-primary fw-medium">Ref / ID: {{ t.display_id_code }}</small>
+                            {% endif %}
+                            {% if t.display_dept %}
+                                <small class="text-muted d-block">Dept / Lab: {{ t.display_dept }}</small>
+                            {% endif %}
+                            {% if t.display_phone %}
+                                <div class="small text-muted mt-1">
+                                    <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}" target="_blank" class="text-decoration-none text-success fw-medium">
+                                        <i class="fa-brands fa-whatsapp me-1"></i>{{ t.display_phone }}
+                                    </a>
+                                </div>
+                            {% else %}
+                                <div class="small text-danger mt-1">
+                                    <i class="fa-solid fa-phone-slash me-1"></i>No Mobile
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="fw-semibold">{{ t.component_name }}</div>
+                            <small class="text-muted">{{ t.category }}</small>
+                        </td>
+                        <td>
+                            <span class="badge bg-light text-dark border px-2 py-1 fs-6">
+                                {{ t.quantity }} {{ t.unit }}
+                            </span>
+                        </td>
+                        <td>
+                            <div>{{ t.purpose or 'Academic / Lab Purpose' }}</div>
+                            {% if t.damage_remarks %}
+                                <small class="text-danger"><i class="fa-solid fa-note-sticky me-1"></i>Note: {{ t.damage_remarks }}</small>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if t.status == 'ISSUED' %}
+                                <span class="badge bg-warning text-dark px-2 py-1">
+                                    <i class="fa-solid fa-clock me-1"></i>Pending Return
+                                </span>
+                            {% elif t.status == 'RETURNED' %}
+                                <span class="badge bg-success px-2 py-1">
+                                    <i class="fa-solid fa-check-double me-1"></i>Returned ({{ t.returned_good_qty }} Good)
+                                </span>
+                                {% if t.return_date %}<div class="small text-muted">{{ t.return_date.split()[0] }}</div>{% endif %}
+                            {% elif t.status in ['RETURNED_WITH_ISSUES', 'ALL_DAMAGED', 'ALL_MISSING'] %}
+                                <div class="d-flex flex-column gap-1">
+                                    {% if t.returned_good_qty > 0 %}
+                                        <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Good: {{ t.returned_good_qty }}</span>
+                                    {% endif %}
+                                    {% if t.returned_damaged_qty > 0 %}
+                                        <span class="badge bg-danger"><i class="fa-solid fa-burst me-1"></i>Damaged: {{ t.returned_damaged_qty }}</span>
+                                    {% endif %}
+                                    {% if t.returned_missing_qty > 0 %}
+                                        <span class="badge bg-dark"><i class="fa-solid fa-circle-question me-1"></i>Missing: {{ t.returned_missing_qty }}</span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="badge bg-secondary px-2 py-1">
+                                    <i class="fa-solid fa-fire me-1"></i>Consumed
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <div class="d-inline-flex gap-1 align-items-center">
+                                {% if t.status == 'ISSUED' %}
+                                    <button type="button" class="btn btn-sm btn-success btn-custom shadow-sm open-return-modal-btn"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#detailedReturnModal"
+                                            data-txnid="{{ t.id }}"
+                                            data-recipient="{{ t.display_name }} ({{ t.display_type }})"
+                                            data-component="{{ t.component_name }}"
+                                            data-qty="{{ t.quantity }}"
+                                            data-unit="{{ t.unit }}">
+                                        <i class="fa-solid fa-arrow-down-left-and-up-right-to-center me-1"></i> Return (IN)
+                                    </button>
+                                {% endif %}
+
+                                {% if t.display_phone %}
+                                    {% if t.status == 'ISSUED' %}
+                                        <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ 'COLLEGE COMPUTER LAB: Reminder for issued equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ '). Please return after session.' | urlencode }}"
+                                           target="_blank" class="btn btn-sm btn-outline-success" title="Send WhatsApp Message">
+                                            <i class="fa-brands fa-whatsapp"></i>
+                                        </a>
+                                    {% else %}
+                                        <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ 'COLLEGE COMPUTER LAB: Receipt for returned equipment ' ~ t.component_name ~ '. Thank you!' | urlencode }}"
+                                           target="_blank" class="btn btn-sm btn-outline-secondary" title="Send WhatsApp Receipt">
+                                            <i class="fa-brands fa-whatsapp"></i>
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="fa-solid fa-receipt fa-3x mb-2 text-secondary"></i>
+                            <p class="mb-0">No transactions recorded under this filter.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Issue Component Modal (with Student / Faculty / Other Lab selector) -->
+<div class="modal fade" id="issueModal" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <form action="{{ url_for('issue_component') }}" method="POST">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-2"></i>Issue Component (Stock OUT)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Recipient Selector Radio Pills -->
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-dark">Issue Equipment To (कोणाला द्यायचे आहे?) *</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="recipient_type" id="rcpStudent" value="STUDENT" checked>
+                            <label class="btn btn-outline-primary fw-semibold py-2" for="rcpStudent">
+                                <i class="fa-solid fa-user-graduate me-1"></i> Student (विद्यार्थी)
+                            </label>
+
+                            <input type="radio" class="btn-check" name="recipient_type" id="rcpStaff" value="STAFF">
+                            <label class="btn btn-outline-success fw-semibold py-2" for="rcpStaff">
+                                <i class="fa-solid fa-chalkboard-user me-1"></i> Faculty / Staff (शिक्षक)
+                            </label>
+
+                            <input type="radio" class="btn-check" name="recipient_type" id="rcpOtherLab" value="OTHER_LAB">
+                            <label class="btn btn-outline-warning text-dark fw-semibold py-2" for="rcpOtherLab">
+                                <i class="fa-solid fa-flask-vial me-1"></i> Other Lab (दुसरी लॅब)
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 1. SECTION: STUDENT -->
+                    <div id="sectionStudent" class="row g-3 p-3 bg-light rounded-3 mb-3 border">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-user-graduate text-primary me-1"></i>Select Student (Name / UID No) *
+                            </label>
+                            <select id="studentSelect" name="student_id" placeholder="Type student name or UID to search...">
+                                <option value="">Type to search student...</option>
+                                {% for s in students %}
+                                    <option value="{{ s.id }}" data-phone="{{ s.phone or '' }}" data-name="{{ s.name }}" data-roll="{{ s.roll_no }}">
+                                        {{ s.name }} (UID: {{ s.roll_no }}) {% if s.phone %}📱 {{ s.phone }}{% else %}⚠ No Mobile{% endif %}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-phone text-success me-1"></i>Student Mobile Number *
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white">+91</span>
+                                <input type="tel" id="studentPhoneInput" name="student_phone" class="form-control" placeholder="10-digit mobile number" pattern="[0-9]{10}" maxlength="10">
+                            </div>
+                            <small id="phoneStatusBadge" class="d-block mt-1 text-muted">Auto-loaded or enter to save for WhatsApp receipt.</small>
+                        </div>
+                        <div class="col-12" id="studentActiveNoticeContainer" style="display: none;"></div>
+                    </div>
+
+                    <!-- 2. SECTION: FACULTY / STAFF -->
+                    <div id="sectionStaff" class="row g-3 p-3 bg-light rounded-3 mb-3 border" style="display: none;">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-chalkboard-user text-success me-1"></i>Faculty / Staff Name (Type or Select) *
+                            </label>
+                            <select id="staffSelect" name="staff_name" placeholder="Type staff name or Emp ID to search or add new...">
+                                <option value="">Type to search existing staff or enter new...</option>
+                                {% for st in staff_list %}
+                                    <option value="{{ st.name }}"
+                                            data-name="{{ st.name }}"
+                                            data-empid="{{ st.employee_id or '' }}"
+                                            data-dept="{{ st.department or '' }}"
+                                            data-phone="{{ st.phone or '' }}">
+                                        {{ st.name }} {% if st.employee_id %}({{ st.employee_id }}){% endif %} - {{ st.department }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-phone text-success me-1"></i>Staff Mobile Number * (for WhatsApp)
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white">+91</span>
+                                <input type="tel" id="staffPhoneInput" name="staff_phone" class="form-control" placeholder="10-digit mobile number" pattern="[0-9]{10}" maxlength="10">
+                            </div>
+                            <small id="staffPhoneBadge" class="d-block mt-1 text-muted">Auto-filled from records or enter 10 digits.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Department / Designation</label>
+                            <input type="text" id="staffDeptInput" name="staff_dept" class="form-control" placeholder="e.g. Computer Engineering / Assistant Professor">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Staff Employee ID (Optional)</label>
+                            <input type="text" id="staffIdCodeInput" name="staff_id_code" class="form-control" placeholder="e.g. EMP-101">
+                        </div>
+                        <div class="col-12" id="staffActiveNoticeContainer" style="display: none;"></div>
+                    </div>
+
+                    <!-- 3. SECTION: OTHER LAB -->
+                    <div id="sectionOtherLab" class="row g-3 p-3 bg-light rounded-3 mb-3 border" style="display: none;">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-flask-vial text-warning me-1"></i>Target Lab Name (Type or Select) *
+                            </label>
+                            <select id="labSelect" name="lab_name" placeholder="Type lab name or in-charge to search or add new...">
+                                <option value="">Type to search existing lab or enter new...</option>
+                                {% for lb in labs_list %}
+                                    <option value="{{ lb.lab_name }}"
+                                            data-labname="{{ lb.lab_name }}"
+                                            data-incharge="{{ lb.incharge_name or '' }}"
+                                            data-room="{{ lb.room_no or '' }}"
+                                            data-phone="{{ lb.phone or '' }}">
+                                        {{ lb.lab_name }} - {{ lb.room_no or '' }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-phone text-success me-1"></i>In-Charge Mobile * (for WhatsApp)
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text bg-white">+91</span>
+                                <input type="tel" id="labPhoneInput" name="lab_phone" class="form-control" placeholder="10-digit mobile number" pattern="[0-9]{10}" maxlength="10">
+                            </div>
+                            <small id="labPhoneBadge" class="d-block mt-1 text-muted">Auto-filled from records or enter 10 digits.</small>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Lab In-Charge / Assistant Name</label>
+                            <input type="text" id="labInchargeInput" name="lab_incharge" class="form-control" placeholder="e.g. Mr. S. More (Lab Assistant)">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Room / Lab Number</label>
+                            <input type="text" id="labRoomNoInput" name="lab_room_no" class="form-control" placeholder="e.g. Lab 204, 2nd Floor">
+                        </div>
+                        <div class="col-12" id="labActiveNoticeContainer" style="display: none;"></div>
+                    </div>
+
+                    <!-- Purpose / Session Details -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">
+                                <i class="fa-solid fa-bullseye text-primary me-1"></i>Purpose / Session Details (उद्देश / प्रॅक्टिकल तपशील)
+                            </label>
+                            <input type="text" name="purpose" class="form-control" placeholder="e.g. Embedded Practical, IoT Sensor Lab, Semester Project">
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Multi-Component Cart Table -->
+                    <div class="card border mb-3 shadow-sm">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center py-2">
+                            <span class="fw-bold text-navy">
+                                <i class="fa-solid fa-layer-group text-primary me-1"></i>
+                                Components to Issue (साहित्याची यादी)
+                                <span id="cartCountBadge" class="badge bg-primary rounded-pill ms-2">1 Item</span>
+                            </span>
+                            <button type="button" id="btnAddItemRow" class="btn btn-sm btn-primary fw-semibold">
+                                <i class="fa-solid fa-plus me-1"></i> Add Another Component (+ आणखी सामान जोडा)
+                            </button>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-bordered align-middle mb-0" id="issueItemsTable">
+                                    <thead class="table-light small text-uppercase fw-semibold text-secondary">
+                                        <tr>
+                                            <th style="width: 46%;">Component (नाव व उपलब्ध साठा) *</th>
+                                            <th style="width: 22%;">Qty to Issue *</th>
+                                            <th style="width: 24%;">Item Type (प्रकार)</th>
+                                            <th style="width: 8%; text-align: center;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="issueItemsTableBody">
+                                        <!-- Row 1 -->
+                                        <tr class="item-row">
+                                            <td>
+                                                <select name="component_ids[]" class="form-select comp-select" required>
+                                                    <option value="">-- Choose Component --</option>
+                                                    {% for c in components %}
+                                                        <option value="{{ c.id }}"
+                                                                data-name="{{ c.name }}"
+                                                                data-avail="{{ c.quantity }}"
+                                                                data-unit="{{ c.unit }}"
+                                                                data-category="{{ c.category }}">
+                                                            {{ c.name }} (Available: {{ c.quantity }} {{ c.unit }}) [{{ c.category }}]
+                                                        </option>
+                                                    {% endfor %}
+                                                </select>
+                                                <div class="row-stock-info small mt-1" style="display:none;">
+                                                    <span class="badge bg-light text-dark border">
+                                                        <i class="fa-solid fa-cubes me-1 text-primary"></i>
+                                                        <span class="stock-avail-text">0</span>
+                                                    </span>
+                                                    <span class="holder-notice-inline ms-1"></span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="input-group">
+                                                    <input type="number" name="quantities[]" class="form-control comp-qty" min="1" value="1" required>
+                                                    <span class="input-group-text bg-light text-muted unit-badge small" style="min-width: 50px;">Unit</span>
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <select name="is_consumables[]" class="form-select comp-consumable">
+                                                    <option value="no">Returnable (Hardware)</option>
+                                                    <option value="yes">Consumable (खर्च होणारे)</option>
+                                                </select>
+                                            </td>
+                                            <td class="text-center">
+                                                <button type="button" class="btn btn-outline-danger btn-sm remove-row-btn" title="Remove row" disabled>
+                                                    <i class="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="card-footer bg-light py-2 text-muted small d-flex justify-content-between align-items-center">
+                            <span><i class="fa-solid fa-circle-info text-info me-1"></i> एकाच वेळी अनेक वस्तू जोडून एका क्लिकवर इश्यू करू शकता. सर्व आयटम्स एकाच व्हॉट्सअँप रिसिटमध्ये पाठवले जातील.</span>
+                            <span class="fw-semibold text-dark" id="totalCartSummary">Total: 1 Item | 1 Unit</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">
+                        <i class="fa-solid fa-paper-plane me-1"></i> Issue Equipment & Send WhatsApp
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Detailed Return Modal (Good, Damaged, Missing Breakdown) -->
+<div class="modal fade" id="detailedReturnModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form id="returnForm" method="POST" action="">
+                <div class="modal-header bg-success text-white">
+                    <h5 class="modal-title fw-bold">
+                        <i class="fa-solid fa-clipboard-check me-2"></i>Process Return (IN Breakdown)
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Item Info Card -->
+                    <div class="card bg-light border-0 p-3 mb-3">
+                        <div class="row g-2 small">
+                            <div class="col-6">
+                                <span class="text-muted d-block">Returned By:</span>
+                                <strong id="modalRecipientName" class="text-dark">-</strong>
+                            </div>
+                            <div class="col-6">
+                                <span class="text-muted d-block">Component:</span>
+                                <strong id="modalComponentName" class="text-dark">-</strong>
+                            </div>
+                            <div class="col-12 mt-2 pt-2 border-top">
+                                <span class="text-muted">Total Issued Quantity:</span>
+                                <span id="modalTotalQtyBadge" class="badge bg-primary fs-6 ms-1">0 Nos</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <p class="small text-muted mb-2">Enter the condition breakdown of items returned:</p>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-success">
+                                <i class="fa-solid fa-circle-check me-1"></i>Good (चांगले)
+                            </label>
+                            <input type="number" id="inputGoodQty" name="good_qty" class="form-control form-control-lg border-success text-center fw-bold" min="0" value="0" required>
+                            <small class="text-muted d-block text-center mt-1">Restored to Stock</small>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-danger">
+                                <i class="fa-solid fa-burst me-1"></i>Damaged (खराब)
+                            </label>
+                            <input type="number" id="inputDamagedQty" name="damaged_qty" class="form-control form-control-lg border-danger text-center fw-bold" min="0" value="0" required>
+                            <small class="text-muted d-block text-center mt-1">Sent to Scrap/Repair</small>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label fw-bold text-dark">
+                                <i class="fa-solid fa-circle-question me-1"></i>Missing (हरवले)
+                            </label>
+                            <input type="number" id="inputMissingQty" name="missing_qty" class="form-control form-control-lg border-dark text-center fw-bold" min="0" value="0" required>
+                            <small class="text-muted d-block text-center mt-1">Accountable</small>
+                        </div>
+                    </div>
+
+                    <!-- Live Counter Banner -->
+                    <div id="counterBanner" class="alert alert-info mt-3 py-2 text-center fw-semibold small mb-3">
+                        Accounted: <span id="accountedSum">0</span> / <span id="targetTotal">0</span>
+                    </div>
+
+                    <!-- Remarks -->
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold">Damage / Loss Remarks</label>
+                        <textarea name="damage_remarks" class="form-control" rows="2" placeholder="e.g. Returned with minor defect, cable issue, etc."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="btnSubmitReturn" class="btn btn-success fw-semibold">
+                        <i class="fa-solid fa-check me-1"></i> Confirm Return & Prepare WhatsApp
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Instant WhatsApp Receipt Modal -->
+{% if whatsapp_popup %}
+<div class="modal fade" id="whatsappReceiptModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold">
+                    <i class="fa-brands fa-whatsapp fa-lg me-2"></i>{{ whatsapp_popup.title }}
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center p-4">
+                <div class="mb-3">
+                    <span class="badge bg-success bg-opacity-10 text-success border border-success px-3 py-2 fs-6 rounded-pill">
+                        {{ whatsapp_popup.student_name }}
+                    </span>
+                    <span class="badge bg-light text-dark border px-3 py-2 fs-6 rounded-pill ms-2">
+                        <i class="fa-solid fa-phone me-1 text-success"></i> +91 {{ whatsapp_popup.phone[-10:] }}
+                    </span>
+                </div>
+
+                <div class="card bg-light border-0 p-3 text-start small mb-3 rounded-3" style="border-left: 4px solid #25D366 !important;">
+                    <div class="fw-bold text-success mb-1">
+                        <i class="fa-solid fa-receipt me-1"></i> WhatsApp Message Preview:
+                    </div>
+                    <pre class="mb-0 text-dark" style="white-space: pre-wrap; font-family: inherit; font-size: 0.9rem;">{{ whatsapp_popup.message_text }}</pre>
+                </div>
+
+                <p class="text-muted small mb-4">Click below to open WhatsApp Web or App and send this receipt:</p>
+
+                <a href="{{ whatsapp_popup.url }}" target="_blank" class="btn btn-success btn-lg w-100 shadow py-3 fw-bold rounded-pill" onclick="closeWhatsAppModal()">
+                    <i class="fa-brands fa-whatsapp fa-xl me-2"></i> Send WhatsApp Receipt Now
+                </a>
+            </div>
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    var activeIssuesData = {{ active_issues_json | safe }};
+
+    function renderActiveNotice(containerId, items, titleSuffix) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+        if (!items || items.length === 0) {
+            container.style.display = "block";
+            container.innerHTML = `
+                <div class="alert alert-success py-2 px-3 mb-0 small border border-success">
+                    <i class="fa-solid fa-circle-check text-success me-1"></i> या ${titleSuffix} कडे सध्या कोणतेही प्रलंबित सामान नाही (No pending items).
+                </div>`;
+            return;
+        }
+        var listHtml = items.map(function(it) {
+            return `<li><strong>${it.component_name}</strong> — ${it.quantity} ${it.unit} <span class="text-muted">(${it.date ? 'Issued: ' + it.date : ''}${it.purpose ? ' | ' + it.purpose : ''})</span></li>`;
+        }).join('');
+        container.style.display = "block";
+        container.innerHTML = `
+            <div class="alert alert-warning py-2 px-3 mb-0 small border border-warning shadow-sm">
+                <div class="fw-bold text-dark">
+                    <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> आधीच सामान नेलेले आहे (Already Issued Items Pending Return):
+                </div>
+                <ul class="mb-0 ps-3 mt-1 text-dark">${listHtml}</ul>
+            </div>`;
+    }
+
+    // 1. Show WhatsApp Popup automatically if triggered
+    var waModalEl = document.getElementById("whatsappReceiptModal");
+    if (waModalEl) {
+        var waModal = new bootstrap.Modal(waModalEl);
+        waModal.show();
+    }
+
+    // 2. Recipient Type Toggle Logic (Student, Faculty, Other Lab)
+    var rcpStudentRadio = document.getElementById("rcpStudent");
+    var rcpStaffRadio = document.getElementById("rcpStaff");
+    var rcpOtherLabRadio = document.getElementById("rcpOtherLab");
+
+    var sectionStudent = document.getElementById("sectionStudent");
+    var sectionStaff = document.getElementById("sectionStaff");
+    var sectionOtherLab = document.getElementById("sectionOtherLab");
+
+    var studentPhoneInput = document.getElementById("studentPhoneInput");
+    var staffPhoneInput = document.getElementById("staffPhoneInput");
+    var labPhoneInput = document.getElementById("labPhoneInput");
+
+    function updateRecipientType() {
+        if (rcpStudentRadio.checked) {
+            sectionStudent.style.display = "flex";
+            sectionStaff.style.display = "none";
+            sectionOtherLab.style.display = "none";
+
+            studentPhoneInput.required = true;
+            staffPhoneInput.required = false;
+            labPhoneInput.required = false;
+        } else if (rcpStaffRadio.checked) {
+            sectionStudent.style.display = "none";
+            sectionStaff.style.display = "flex";
+            sectionOtherLab.style.display = "none";
+
+            studentPhoneInput.required = false;
+            staffPhoneInput.required = true;
+            labPhoneInput.required = false;
+        } else if (rcpOtherLabRadio.checked) {
+            sectionStudent.style.display = "none";
+            sectionStaff.style.display = "none";
+            sectionOtherLab.style.display = "flex";
+
+            studentPhoneInput.required = false;
+            staffPhoneInput.required = false;
+            labPhoneInput.required = true;
+        }
+    }
+
+    rcpStudentRadio.addEventListener("change", updateRecipientType);
+    rcpStaffRadio.addEventListener("change", updateRecipientType);
+    rcpOtherLabRadio.addEventListener("change", updateRecipientType);
+    updateRecipientType();
+
+    // 3. Tom Select for Student
+    var phoneInput = document.getElementById("studentPhoneInput");
+    var phoneBadge = document.getElementById("phoneStatusBadge");
+    var studentSelectEl = document.getElementById("studentSelect");
+
+    if (studentSelectEl) {
+        new TomSelect(studentSelectEl, {
+            create: false,
+            sortField: { field: "text", direction: "asc" },
+            placeholder: "Type student name or UID to search...",
+            dropdownParent: 'body',
+            onChange: function(value) {
+                if (!value) {
+                    phoneInput.value = "";
+                    phoneBadge.innerHTML = 'Required for sending instant WhatsApp receipts.';
+                    phoneBadge.className = 'd-block mt-1 text-muted';
+                    var c = document.getElementById("studentActiveNoticeContainer");
+                    if (c) c.style.display = "none";
+                    return;
+                }
+                var selectedOption = studentSelectEl.querySelector('option[value="' + value + '"]');
+                var roll = '';
+                if (selectedOption) {
+                    roll = (selectedOption.getAttribute('data-roll') || '').trim().toUpperCase();
+                    var phone = selectedOption.getAttribute('data-phone') || '';
+                    var cleanPhone = phone.replace(/\D/g, '').slice(-10);
+                    if (cleanPhone.length === 10) {
+                        phoneInput.value = cleanPhone;
+                        phoneBadge.innerHTML = '<i class="fa-solid fa-circle-check text-success me-1"></i> Saved Mobile loaded from database.';
+                        phoneBadge.className = 'd-block mt-1 text-success fw-semibold small';
+                    } else {
+                        phoneInput.value = "";
+                        phoneBadge.innerHTML = '<i class="fa-solid fa-triangle-exclamation text-danger me-1"></i> No mobile number in database! <strong>Please enter 10-digit number to save.</strong>';
+                        phoneBadge.className = 'd-block mt-1 text-danger fw-semibold small';
+                        phoneInput.focus();
+                    }
+                }
+                var pending = (activeIssuesData.students && (activeIssuesData.students[value] || activeIssuesData.students[roll])) || [];
+                renderActiveNotice("studentActiveNoticeContainer", pending, "विद्यार्थ्या");
+            }
+        });
+    }
+
+    // 4. Tom Select for Faculty / Staff
+    var staffSelectEl = document.getElementById("staffSelect");
+    var staffDeptInput = document.getElementById("staffDeptInput");
+    var staffIdCodeInput = document.getElementById("staffIdCodeInput");
+    var staffPhoneBadge = document.getElementById("staffPhoneBadge");
+
+    if (staffSelectEl) {
+        new TomSelect(staffSelectEl, {
+            create: true,
+            createOnBlur: true,
+            persist: false,
+            sortField: { field: "text", direction: "asc" },
+            placeholder: "Type staff name or Emp ID to search or add new...",
+            dropdownParent: 'body',
+            onChange: function(value) {
+                if (!value) {
+                    staffPhoneInput.value = "";
+                    if (staffDeptInput) staffDeptInput.value = "";
+                    if (staffIdCodeInput) staffIdCodeInput.value = "";
+                    var c = document.getElementById("staffActiveNoticeContainer");
+                    if (c) c.style.display = "none";
+                    return;
+                }
+                var selectedOption = staffSelectEl.querySelector('option[value="' + CSS.escape(value) + '"]');
+                if (selectedOption) {
+                    var phone = (selectedOption.getAttribute('data-phone') || '').replace(/\D/g, '').slice(-10);
+                    var dept = selectedOption.getAttribute('data-dept') || '';
+                    var empid = selectedOption.getAttribute('data-empid') || '';
+                    if (phone) staffPhoneInput.value = phone;
+                    if (dept && staffDeptInput) staffDeptInput.value = dept;
+                    if (empid && staffIdCodeInput) staffIdCodeInput.value = empid;
+                    if (staffPhoneBadge) {
+                        staffPhoneBadge.innerHTML = phone ? '<i class="fa-solid fa-circle-check text-success me-1"></i> Auto-filled from faculty records.' : '<i class="fa-solid fa-triangle-exclamation text-danger me-1"></i> Please enter 10-digit mobile number.';
+                        staffPhoneBadge.className = phone ? 'd-block mt-1 text-success fw-semibold small' : 'd-block mt-1 text-danger fw-semibold small';
+                    }
+                } else {
+                    if (staffPhoneBadge) {
+                        staffPhoneBadge.innerHTML = '<i class="fa-solid fa-plus-circle text-primary me-1"></i> New staff: Please enter mobile & department.';
+                        staffPhoneBadge.className = 'd-block mt-1 text-primary small';
+                    }
+                }
+                var valKey = value.trim().toLowerCase();
+                var pending = (activeIssuesData.staff && activeIssuesData.staff[valKey]) || [];
+                renderActiveNotice("staffActiveNoticeContainer", pending, "स्टाफ");
+            }
+        });
+    }
+
+    // 5. Tom Select for Other Lab
+    var labSelectEl = document.getElementById("labSelect");
+    var labInchargeInput = document.getElementById("labInchargeInput");
+    var labRoomNoInput = document.getElementById("labRoomNoInput");
+    var labPhoneBadge = document.getElementById("labPhoneBadge");
+
+    if (labSelectEl) {
+        new TomSelect(labSelectEl, {
+            create: true,
+            createOnBlur: true,
+            persist: false,
+            sortField: { field: "text", direction: "asc" },
+            placeholder: "Type lab name or in-charge to search or add new...",
+            dropdownParent: 'body',
+            onChange: function(value) {
+                if (!value) {
+                    labPhoneInput.value = "";
+                    if (labInchargeInput) labInchargeInput.value = "";
+                    if (labRoomNoInput) labRoomNoInput.value = "";
+                    var c = document.getElementById("labActiveNoticeContainer");
+                    if (c) c.style.display = "none";
+                    return;
+                }
+                var selectedOption = labSelectEl.querySelector('option[value="' + CSS.escape(value) + '"]');
+                if (selectedOption) {
+                    var phone = (selectedOption.getAttribute('data-phone') || '').replace(/\D/g, '').slice(-10);
+                    var incharge = selectedOption.getAttribute('data-incharge') || '';
+                    var room = selectedOption.getAttribute('data-room') || '';
+                    if (phone) labPhoneInput.value = phone;
+                    if (incharge && labInchargeInput) labInchargeInput.value = incharge;
+                    if (room && labRoomNoInput) labRoomNoInput.value = room;
+                    if (labPhoneBadge) {
+                        labPhoneBadge.innerHTML = phone ? '<i class="fa-solid fa-circle-check text-success me-1"></i> Auto-filled from lab records.' : '<i class="fa-solid fa-triangle-exclamation text-danger me-1"></i> Please enter in-charge mobile number.';
+                        labPhoneBadge.className = phone ? 'd-block mt-1 text-success fw-semibold small' : 'd-block mt-1 text-danger fw-semibold small';
+                    }
+                } else {
+                    if (labPhoneBadge) {
+                        labPhoneBadge.innerHTML = '<i class="fa-solid fa-plus-circle text-warning text-dark me-1"></i> New lab: Please enter in-charge mobile & room.';
+                        labPhoneBadge.className = 'd-block mt-1 text-dark small';
+                    }
+                }
+                var valKey = value.trim().toLowerCase();
+                var pending = (activeIssuesData.labs && activeIssuesData.labs[valKey]) || [];
+                renderActiveNotice("labActiveNoticeContainer", pending, "लॅब");
+            }
+        });
+    }
+
+    // 6. Dynamic Multi-Component Cart Management
+    var itemsTableBody = document.getElementById("issueItemsTableBody");
+    var btnAddItemRow = document.getElementById("btnAddItemRow");
+    var cartCountBadge = document.getElementById("cartCountBadge");
+    var totalCartSummary = document.getElementById("totalCartSummary");
+
+    function updateRowDetails(row) {
+        var compSelect = row.querySelector(".comp-select");
+        var qtyInput = row.querySelector(".comp-qty");
+        var unitBadge = row.querySelector(".unit-badge");
+        var consumableSelect = row.querySelector(".comp-consumable");
+        var stockInfoDiv = row.querySelector(".row-stock-info");
+        var stockAvailSpan = row.querySelector(".stock-avail-text");
+        var holderNoticeSpan = row.querySelector(".holder-notice-inline");
+
+        if (!compSelect || !compSelect.value) {
+            if (stockInfoDiv) stockInfoDiv.style.display = "none";
+            if (unitBadge) unitBadge.innerText = "Unit";
+            if (qtyInput) qtyInput.removeAttribute("max");
+            updateCartTotals();
+            return;
+        }
+
+        var opt = compSelect.options[compSelect.selectedIndex];
+        var avail = parseInt(opt.getAttribute("data-avail") || "0", 10);
+        var unit = opt.getAttribute("data-unit") || "Unit";
+        var cat = opt.getAttribute("data-category") || "";
+        var compId = compSelect.value;
+
+        if (unitBadge) unitBadge.innerText = unit;
+        if (qtyInput) {
+            qtyInput.max = avail;
+            if (parseInt(qtyInput.value || "1", 10) > avail && avail > 0) {
+                qtyInput.value = avail;
+            }
+        }
+        if (cat === "Consumable" && consumableSelect) {
+            consumableSelect.value = "yes";
+        }
+
+        if (stockInfoDiv && stockAvailSpan) {
+            stockInfoDiv.style.display = "block";
+            stockAvailSpan.innerHTML = `Available: <strong>${avail} ${unit}</strong>`;
+        }
+
+        if (holderNoticeSpan) {
+            var holders = (activeIssuesData.components && activeIssuesData.components[compId]) || [];
+            if (holders.length > 0) {
+                var totalHeld = holders.reduce(function(sum, h) { return sum + (h.quantity || 0); }, 0);
+                holderNoticeSpan.innerHTML = `<span class="badge bg-warning bg-opacity-25 text-dark border border-warning" title="${holders.length} active borrower(s)"><i class="fa-solid fa-clock-rotate-left me-1"></i>${totalHeld} ${unit} checked out (${holders.length} borrower${holders.length > 1 ? 's' : ''})</span>`;
+            } else {
+                holderNoticeSpan.innerHTML = "";
+            }
+        }
+
+        updateCartTotals();
+    }
+
+    function updateCartTotals() {
+        if (!itemsTableBody) return;
+        var rows = itemsTableBody.querySelectorAll(".item-row");
+        var count = rows.length;
+        var totalUnits = 0;
+
+        rows.forEach(function(row) {
+            var q = parseInt(row.querySelector(".comp-qty") ? row.querySelector(".comp-qty").value : "0", 10);
+            totalUnits += isNaN(q) ? 0 : q;
+        });
+
+        if (cartCountBadge) {
+            cartCountBadge.innerText = count + (count === 1 ? " Item" : " Items");
+        }
+        if (totalCartSummary) {
+            totalCartSummary.innerText = `Total: ${count} ${count === 1 ? 'Item' : 'Items'} | ${totalUnits} Units`;
+        }
+
+        // Enable or disable remove buttons
+        var removeBtns = itemsTableBody.querySelectorAll(".remove-row-btn");
+        removeBtns.forEach(function(btn) {
+            btn.disabled = (count <= 1);
+        });
+    }
+
+    function attachRowListeners(row) {
+        var compSelect = row.querySelector(".comp-select");
+        var qtyInput = row.querySelector(".comp-qty");
+        var removeBtn = row.querySelector(".remove-row-btn");
+
+        if (compSelect) {
+            compSelect.addEventListener("change", function() {
+                updateRowDetails(row);
+            });
+        }
+        if (qtyInput) {
+            qtyInput.addEventListener("input", function() {
+                var max = parseInt(this.max || "999999", 10);
+                if (max > 0 && parseInt(this.value, 10) > max) {
+                    this.value = max;
+                }
+                updateCartTotals();
+            });
+        }
+        if (removeBtn) {
+            removeBtn.addEventListener("click", function() {
+                var rows = itemsTableBody.querySelectorAll(".item-row");
+                if (rows.length > 1) {
+                    row.remove();
+                    updateCartTotals();
+                }
+            });
+        }
+    }
+
+    if (itemsTableBody && btnAddItemRow) {
+        // Initialize initial row
+        var initialRow = itemsTableBody.querySelector(".item-row");
+        if (initialRow) attachRowListeners(initialRow);
+
+        btnAddItemRow.addEventListener("click", function() {
+            var firstRow = itemsTableBody.querySelector(".item-row");
+            if (!firstRow) return;
+
+            var newRow = firstRow.cloneNode(true);
+            var select = newRow.querySelector(".comp-select");
+            var qty = newRow.querySelector(".comp-qty");
+            var unit = newRow.querySelector(".unit-badge");
+            var cons = newRow.querySelector(".comp-consumable");
+            var stockDiv = newRow.querySelector(".row-stock-info");
+            var holderNotice = newRow.querySelector(".holder-notice-inline");
+
+            if (select) select.value = "";
+            if (qty) { qty.value = 1; qty.removeAttribute("max"); }
+            if (unit) unit.innerText = "Unit";
+            if (cons) cons.value = "no";
+            if (stockDiv) stockDiv.style.display = "none";
+            if (holderNotice) holderNotice.innerHTML = "";
+
+            itemsTableBody.appendChild(newRow);
+            attachRowListeners(newRow);
+            updateCartTotals();
+            if (select) select.focus();
+        });
+    }
+
+    // Validation before submitting Issue Form
+    var issueForm = document.querySelector("#issueModal form");
+    if (issueForm) {
+        issueForm.addEventListener("submit", function(e) {
+            var selects = issueForm.querySelectorAll(".comp-select");
+            var chosen = [];
+            var hasDuplicate = false;
+
+            selects.forEach(function(s) {
+                if (s.value) {
+                    if (chosen.indexOf(s.value) !== -1) {
+                        hasDuplicate = true;
+                    }
+                    chosen.push(s.value);
+                }
+            });
+
+            if (hasDuplicate) {
+                e.preventDefault();
+                alert("दोन किंवा अधिक ओळींमध्ये एकच कॉम्पोनंट निवडलेला आहे. कृपया एकाच ओळीत संख्या वाढवा किंवा वेगळा कॉम्पोनंट निवडा.\n(Duplicate component selected in multiple rows. Please combine quantity or select different items.)");
+                return false;
+            }
+
+            if (chosen.length === 0) {
+                e.preventDefault();
+                alert("कृपया इश्यू करण्यासाठी किमान एक कॉम्पोनंट निवडा.\n(Please select at least one component to issue.)");
+                return false;
+            }
+        });
+    }
+
+    // 7. Instant Live Search on the Transactions Register Table
+    var txnLiveSearch = document.getElementById("txnLiveSearch");
+    var clearSearchBtn = document.getElementById("clearSearchBtn");
+    var tableBody = document.getElementById("transactionsTableBody");
+
+    if (txnLiveSearch && tableBody) {
+        txnLiveSearch.addEventListener("input", function() {
+            var query = this.value.toLowerCase().trim();
+            var rows = tableBody.querySelectorAll("tr");
+            var visibleCount = 0;
+            
+            if (clearSearchBtn) {
+                clearSearchBtn.style.display = query ? "inline-block" : "none";
+            }
+            
+            rows.forEach(function(row) {
+                var text = row.textContent.toLowerCase();
+                if (!query || text.indexOf(query) !== -1) {
+                    row.style.display = "";
+                    visibleCount++;
+                } else {
+                    row.style.display = "none";
+                }
+            });
+            
+            var countBadge = document.getElementById("filteredCountBadge");
+            if (countBadge) {
+                countBadge.innerText = query ? ("Showing " + visibleCount + " matching records") : ("Showing all " + rows.length + " transactions");
+            }
+        });
+        
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener("click", function() {
+                txnLiveSearch.value = "";
+                txnLiveSearch.dispatchEvent(new Event("input"));
+                txnLiveSearch.focus();
+            });
+        }
+    }
+
+    // 8. Detailed Return Modal Logic
+    var totalIssued = 0;
+    var returnForm = document.getElementById("returnForm");
+    var inputGood = document.getElementById("inputGoodQty");
+    var inputDamaged = document.getElementById("inputDamagedQty");
+    var inputMissing = document.getElementById("inputMissingQty");
+    var accountedSumEl = document.getElementById("accountedSum");
+    var targetTotalEl = document.getElementById("targetTotal");
+    var counterBanner = document.getElementById("counterBanner");
+    var btnSubmit = document.getElementById("btnSubmitReturn");
+
+    var returnButtons = document.querySelectorAll(".open-return-modal-btn");
+    returnButtons.forEach(function(btn) {
+        btn.addEventListener("click", function() {
+            var txnId = this.getAttribute("data-txnid");
+            var rcpName = this.getAttribute("data-recipient");
+            var compName = this.getAttribute("data-component");
+            totalIssued = parseInt(this.getAttribute("data-qty"), 10) || 0;
+            var unit = this.getAttribute("data-unit") || "Nos";
+
+            returnForm.action = "/transactions/return/" + txnId;
+
+            document.getElementById("modalRecipientName").innerText = rcpName;
+            document.getElementById("modalComponentName").innerText = compName;
+            document.getElementById("modalTotalQtyBadge").innerText = totalIssued + " " + unit;
+
+            inputGood.value = totalIssued;
+            inputDamaged.value = 0;
+            inputMissing.value = 0;
+
+            targetTotalEl.innerText = totalIssued;
+            validateBreakdown();
+        });
+    });
+
+    function validateBreakdown() {
+        var g = parseInt(inputGood.value, 10) || 0;
+        var d = parseInt(inputDamaged.value, 10) || 0;
+        var m = parseInt(inputMissing.value, 10) || 0;
+
+        var sum = g + d + m;
+        accountedSumEl.innerText = sum;
+
+        if (sum === totalIssued) {
+            counterBanner.className = "alert alert-success mt-3 py-2 text-center fw-semibold small mb-3";
+            counterBanner.innerHTML = '<i class="fa-solid fa-circle-check me-1"></i> Quantities balanced perfectly! (Total: ' + sum + ' / ' + totalIssued + ')';
+            btnSubmit.disabled = false;
+        } else {
+            counterBanner.className = "alert alert-danger mt-3 py-2 text-center fw-semibold small mb-3";
+            counterBanner.innerHTML = '<i class="fa-solid fa-triangle-exclamation me-1"></i> Sum must equal ' + totalIssued + '. Current sum: ' + sum;
+            btnSubmit.disabled = true;
+        }
+    }
+
+    inputGood.addEventListener("input", validateBreakdown);
+    inputDamaged.addEventListener("input", validateBreakdown);
+    inputMissing.addEventListener("input", validateBreakdown);
+});
+
+function closeWhatsAppModal() {
+    var waModalEl = document.getElementById("whatsappReceiptModal");
+    if (waModalEl) {
+        var modal = bootstrap.Modal.getInstance(waModalEl);
+        if (modal) {
+            setTimeout(function() { modal.hide(); }, 600);
+        }
+    }
+}
+</script>
+{% endblock %}

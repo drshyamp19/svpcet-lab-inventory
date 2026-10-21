@@ -1,0 +1,251 @@
+import io
+import csv
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+
+def generate_components_excel_template():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Components Template"
+
+    headers = [
+        "Name", "Category", "Quantity", "Unit", "Min Alert Qty", 
+        "Rack Location", "Specs", "Invoice / Bill No", "Purchase Date", "Vendor Name", "Unit Price"
+    ]
+    ws.append(headers)
+
+    sample_rows = [
+        ["RJ45 Connectors", "Consumable", 100, "Nos", 20, "Rack A-1", "Cat6 Crimping Connectors", "INV-2026-901", "2026-08-15", "D-Link Distributor", 8.50],
+        ["Cat6 LAN Cable Roll", "Consumable", 50, "Meters", 15, "Rack A-2", "D-Link Ethernet Cable", "INV-2026-902", "2026-08-15", "D-Link Distributor", 25.00],
+        ["Dell USB Mouse", "Peripherals/Hardware", 20, "Nos", 5, "Cupboard 1", "Wired Optical Mouse", "Opening Stock", "2025-01-10", "Existing Lab Stock", 250.00],
+        ["HP Standard Keyboard", "Peripherals/Hardware", 15, "Nos", 4, "Cupboard 1", "USB Multimedia Keyboard", "DSR Page 12", "2024-11-05", "College Central Store", 450.00],
+        ["CMOS Battery (CR2032)", "Consumable", 10, "Nos", 5, "Drawer B-1", "3V Lithium Cell", "CASH-BILL-88", "2026-09-01", "Shinde Electronics", 30.00],
+        ["Crimping Tool Kit", "Tools", 5, "Nos", 2, "Toolbox 1", "RJ45/RJ11 Crimping & Punch Tool", "Opening Stock", "2024-06-20", "Existing Lab Stock", 600.00]
+    ]
+    for row in sample_rows:
+        ws.append(row)
+
+    # Style Header
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = openpyxl.utils.get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 15)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+
+def generate_students_excel_template():
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Students Template"
+
+    headers = ["UID No", "Full Name", "Department", "Year", "Division", "Phone"]
+    ws.append(headers)
+
+    sample_rows = [
+        ["UID-2024-001", "Rahul Sharma", "Computer Engineering", "TE", "A", "9876543210"],
+        ["UID-2024-002", "Sneha Patil", "Computer Engineering", "TE", "B", "9876543211"],
+        ["UID-2024-011", "Amit Deshmukh", "Information Technology", "BE", "A", "9876543212"],
+        ["UID-2024-018", "Pooja Jadhav", "AI & Data Science", "SE", "A", "9876543213"]
+    ]
+    for row in sample_rows:
+        ws.append(row)
+
+    # Style Header
+    header_fill = PatternFill(start_color="1E7145", end_color="1E7145", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+
+    for cell in ws[1]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+    for col in ws.columns:
+        max_len = max(len(str(cell.value or '')) for cell in col)
+        col_letter = openpyxl.utils.get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(max_len + 4, 16)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output
+
+
+def parse_components_file(file_storage):
+    filename = file_storage.filename.lower()
+    records = []
+
+    if filename.endswith('.xlsx'):
+        wb = openpyxl.load_workbook(file_storage, data_only=True)
+        sheet = wb.active
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            return records
+        
+        for row in rows[1:]:
+            if not row or not any(row):
+                continue
+            name = str(row[0]).strip() if len(row) > 0 and row[0] is not None else ""
+            if not name:
+                continue
+            category = str(row[1]).strip() if len(row) > 1 and row[1] is not None else "Consumable"
+            try:
+                quantity = int(row[2]) if len(row) > 2 and row[2] is not None else 0
+            except:
+                quantity = 0
+            unit = str(row[3]).strip() if len(row) > 3 and row[3] is not None else "Nos"
+            try:
+                min_alert = int(row[4]) if len(row) > 4 and row[4] is not None else 5
+            except:
+                min_alert = 5
+            rack = str(row[5]).strip() if len(row) > 5 and row[5] is not None else ""
+            specs = str(row[6]).strip() if len(row) > 6 and row[6] is not None else ""
+            
+            invoice_no = str(row[7]).strip() if len(row) > 7 and row[7] is not None else "Opening Stock"
+            purchase_date = str(row[8]).strip() if len(row) > 8 and row[8] is not None else ""
+            vendor_name = str(row[9]).strip() if len(row) > 9 and row[9] is not None else ""
+            try:
+                unit_price = float(row[10]) if len(row) > 10 and row[10] is not None else 0.0
+            except:
+                unit_price = 0.0
+
+            records.append({
+                'name': name,
+                'category': category,
+                'quantity': quantity,
+                'unit': unit,
+                'min_alert_qty': min_alert,
+                'rack_location': rack,
+                'specs': specs,
+                'invoice_no': invoice_no,
+                'purchase_date': purchase_date,
+                'vendor_name': vendor_name,
+                'unit_price': unit_price
+            })
+
+    elif filename.endswith('.csv'):
+        content = file_storage.stream.read().decode('utf-8-sig', errors='ignore')
+        reader = csv.reader(io.StringIO(content))
+        rows = list(reader)
+        if not rows:
+            return records
+        
+        for row in rows[1:]:
+            if not row or not any(row):
+                continue
+            name = row[0].strip() if len(row) > 0 else ""
+            if not name:
+                continue
+            category = row[1].strip() if len(row) > 1 and row[1].strip() else "Consumable"
+            try:
+                quantity = int(row[2].strip()) if len(row) > 2 else 0
+            except:
+                quantity = 0
+            unit = row[3].strip() if len(row) > 3 and row[3].strip() else "Nos"
+            try:
+                min_alert = int(row[4].strip()) if len(row) > 4 else 5
+            except:
+                min_alert = 5
+            rack = row[5].strip() if len(row) > 5 else ""
+            specs = row[6].strip() if len(row) > 6 else ""
+            invoice_no = row[7].strip() if len(row) > 7 and row[7].strip() else "Opening Stock"
+            purchase_date = row[8].strip() if len(row) > 8 else ""
+            vendor_name = row[9].strip() if len(row) > 9 else ""
+            try:
+                unit_price = float(row[10].strip()) if len(row) > 10 else 0.0
+            except:
+                unit_price = 0.0
+
+            records.append({
+                'name': name,
+                'category': category,
+                'quantity': quantity,
+                'unit': unit,
+                'min_alert_qty': min_alert,
+                'rack_location': rack,
+                'specs': specs,
+                'invoice_no': invoice_no,
+                'purchase_date': purchase_date,
+                'vendor_name': vendor_name,
+                'unit_price': unit_price
+            })
+
+    return records
+
+
+def parse_students_file(file_storage):
+    filename = file_storage.filename.lower()
+    records = []
+
+    if filename.endswith('.xlsx'):
+        wb = openpyxl.load_workbook(file_storage, data_only=True)
+        sheet = wb.active
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
+            return records
+        
+        for row in rows[1:]:
+            if not row or not any(row):
+                continue
+            uid_no = str(row[0]).strip().upper() if len(row) > 0 and row[0] is not None else ""
+            name = str(row[1]).strip() if len(row) > 1 and row[1] is not None else ""
+            if not uid_no or not name:
+                continue
+            dept = str(row[2]).strip() if len(row) > 2 and row[2] is not None else "Computer Engineering"
+            year = str(row[3]).strip().upper() if len(row) > 3 and row[3] is not None else "TE"
+            division = str(row[4]).strip().upper() if len(row) > 4 and row[4] is not None else "A"
+            phone = str(row[5]).strip() if len(row) > 5 and row[5] is not None else ""
+            academic_year = str(row[6]).strip() if len(row) > 6 and row[6] is not None else "2026-2027"
+
+            records.append({
+                'roll_no': uid_no, # mapped to student identifier
+                'name': name,
+                'department': dept,
+                'year': year,
+                'division': division,
+                'phone': phone,
+                'academic_year': academic_year or "2026-2027"
+            })
+
+    elif filename.endswith('.csv'):
+        content = file_storage.stream.read().decode('utf-8-sig', errors='ignore')
+        reader = csv.reader(io.StringIO(content))
+        rows = list(reader)
+        if not rows:
+            return records
+        
+        for row in rows[1:]:
+            if not row or not any(row):
+                continue
+            uid_no = row[0].strip().upper() if len(row) > 0 else ""
+            name = row[1].strip() if len(row) > 1 else ""
+            if not uid_no or not name:
+                continue
+            dept = row[2].strip() if len(row) > 2 and row[2].strip() else "Computer Engineering"
+            year = row[3].strip().upper() if len(row) > 3 and row[3].strip() else "TE"
+            division = row[4].strip().upper() if len(row) > 4 else "A"
+            phone = row[5].strip() if len(row) > 5 else ""
+            academic_year = row[6].strip() if len(row) > 6 and row[6].strip() else "2026-2027"
+
+            records.append({
+                'roll_no': uid_no,
+                'name': name,
+                'department': dept,
+                'year': year,
+                'division': division,
+                'phone': phone,
+                'academic_year': academic_year or "2026-2027"
+            })
+
+    return records

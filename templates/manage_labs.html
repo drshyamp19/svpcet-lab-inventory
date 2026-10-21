@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Laboratories - Department of Industrial IoT | SVPCET{% endblock %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-7">
+        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+            <span class="badge bg-danger text-uppercase px-2 py-1"><i class="fa-solid fa-shield-halved me-1"></i> HOD Administration</span>
+            <span class="badge bg-dark text-uppercase px-2 py-1">Department of Industrial IoT</span>
+        </div>
+        <h2 class="fw-bold mb-1" style="color: #0b2545;">
+            <i class="fa-solid fa-network-wired text-primary me-2"></i>Department Laboratories Management
+        </h2>
+        <p class="text-muted mb-0">Create new labs, rename laboratory designations, assign in-charges, and manage technician login accounts.</p>
+    </div>
+    <div class="col-md-5 text-md-end mt-3 mt-md-0">
+        <button class="btn btn-primary btn-custom shadow-sm" data-bs-toggle="modal" data-bs-target="#addNewLabModal">
+            <i class="fa-solid fa-plus-circle me-1"></i> Add New Laboratory
+        </button>
+        <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary btn-custom shadow-sm ms-2">
+            <i class="fa-solid fa-arrow-left me-1"></i> Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Labs Overview Cards -->
+<div class="row g-3 mb-4">
+    {% for lab in labs %}
+    <div class="col-md-6 col-lg-4">
+        <div class="card h-100 shadow-sm border-top border-4 {% if loop.index == 1 %}border-primary{% elif loop.index == 2 %}border-success{% elif loop.index == 3 %}border-info{% else %}border-warning{% endif %}">
+            <div class="card-body p-4 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge bg-light text-dark border fw-bold px-2 py-1">
+                            <i class="fa-solid fa-tag me-1 text-primary"></i> {{ lab.lab_code }}
+                        </span>
+                        {% if lab.is_active %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success px-2 py-1">Active</span>
+                        {% else %}
+                        <span class="badge bg-secondary px-2 py-1">Inactive</span>
+                        {% endif %}
+                    </div>
+
+                    <h4 class="fw-bold mb-1 text-dark">{{ lab.lab_name }}</h4>
+                    <p class="text-muted small mb-3">{{ lab.description or 'Specialized hardware & software practical lab.' }}</p>
+
+                    <div class="bg-light p-3 rounded-3 mb-3 small">
+                        <div class="mb-1">
+                            <i class="fa-solid fa-location-dot text-danger me-2" style="width: 16px;"></i>
+                            <strong>Room:</strong> {{ lab.room_no or 'Not specified' }}
+                        </div>
+                        <div class="mb-1">
+                            <i class="fa-solid fa-user-tie text-primary me-2" style="width: 16px;"></i>
+                            <strong>In-Charge:</strong> {{ lab.incharge_name or 'Faculty In-Charge' }}
+                        </div>
+                        <div>
+                            <i class="fa-solid fa-key text-warning me-2" style="width: 16px;"></i>
+                            <strong>Login User:</strong> <code>{{ lab.username or 'No user' }}</code>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 text-center mb-3">
+                        <div class="col-6">
+                            <div class="p-2 border rounded bg-white">
+                                <div class="fs-5 fw-bold text-primary">{{ lab.total_components }}</div>
+                                <div class="text-muted" style="font-size: 0.72rem;">Components</div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="p-2 border rounded bg-white">
+                                <div class="fs-5 fw-bold text-warning">{{ lab.active_issues }}</div>
+                                <div class="text-muted" style="font-size: 0.72rem;">Pending Issues</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex gap-2 pt-2 border-top">
+                    <!-- Rename / Edit Lab Button -->
+                    <button class="btn btn-outline-primary btn-sm flex-fill" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#editLabModal"
+                            data-lab-id="{{ lab.id }}"
+                            data-lab-code="{{ lab.lab_code }}"
+                            data-lab-name="{{ lab.lab_name }}"
+                            data-room-no="{{ lab.room_no }}"
+                            data-incharge="{{ lab.incharge_name }}"
+                            data-desc="{{ lab.description }}"
+                            onclick="populateEditModal(this)">
+                        <i class="fa-solid fa-pen-to-square me-1"></i> Rename / Edit
+                    </button>
+
+                    <!-- Reset Password Button -->
+                    {% if lab.user_id %}
+                    <button class="btn btn-outline-secondary btn-sm" 
+                            data-bs-toggle="modal" 
+                            data-bs-target="#resetPasswordModal"
+                            data-user-id="{{ lab.user_id }}"
+                            data-username="{{ lab.username }}"
+                            data-lab-name="{{ lab.lab_name }}"
+                            onclick="populateResetPasswordModal(this)"
+                            title="Reset Login Password">
+                        <i class="fa-solid fa-key"></i>
+                    </button>
+                    {% endif %}
+
+                    <!-- Switch to Lab View -->
+                    <a href="{{ url_for('switch_lab', lab_id=lab.id) }}" class="btn btn-primary btn-sm" title="Switch view to this laboratory">
+                        <i class="fa-solid fa-eye me-1"></i> View Lab
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: EDIT / RENAME LABORATORY -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="editLabModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-pen-to-square me-2"></i>Edit / Rename Laboratory</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('rename_lab') }}">
+                <input type="hidden" name="lab_id" id="edit_lab_id">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold small text-muted">Lab Code (Permanent Identifier)</label>
+                        <input type="text" id="edit_lab_code" class="form-control bg-light" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Laboratory Name (लॅबचे नाव) <span class="text-danger">*</span></label>
+                        <input type="text" name="lab_name" id="edit_lab_name" class="form-control" required placeholder="e.g. Embedded Systems & Edge AI Laboratory">
+                        <small class="text-muted">हे नाव बदलल्यास सर्व पेजेस, प्रिंट रिपोर्ट आणि पावतीवर नवीन नाव आपोआप अपडेट होईल.</small>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Room No. / Location</label>
+                            <input type="text" name="room_no" id="edit_room_no" class="form-control" placeholder="e.g. Room B-204">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Lab In-Charge Faculty</label>
+                            <input type="text" name="incharge_name" id="edit_incharge_name" class="form-control" placeholder="e.g. Prof. R. Sharma">
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold">Description / Scope</label>
+                        <textarea name="description" id="edit_description" class="form-control" rows="2" placeholder="Brief info about this lab's domain"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">
+                        <i class="fa-solid fa-check me-1"></i> Save Changes (बदल सेव्ह करा)
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: ADD NEW LABORATORY -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="addNewLabModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header navbar-custom text-white" style="background: linear-gradient(135deg, #0b2545 0%, #133b5c 100%);">
+                <h5 class="modal-title fw-bold text-white"><i class="fa-solid fa-plus-circle me-2 text-warning"></i>Add New Laboratory</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('add_new_lab_route') }}">
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Laboratory Name (लॅबचे नाव) <span class="text-danger">*</span></label>
+                        <input type="text" name="lab_name" class="form-control" required placeholder="e.g. Edge AI & Cloud IoT Laboratory">
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Lab Code <span class="text-danger">*</span></label>
+                            <input type="text" name="lab_code" class="form-control text-uppercase" required placeholder="e.g. LAB_EDGE_AI">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Room No.</label>
+                            <input type="text" name="room_no" class="form-control" placeholder="e.g. Room B-207">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Lab In-Charge Name</label>
+                        <input type="text" name="incharge_name" class="form-control" placeholder="Faculty / Staff In-Charge">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Description</label>
+                        <input type="text" name="description" class="form-control" placeholder="Key focus or equipment">
+                    </div>
+
+                    <hr class="my-3">
+                    <h6 class="fw-bold text-primary mb-2"><i class="fa-solid fa-user-lock me-1"></i> New Lab Login Account (लॉगिन खाते)</h6>
+
+                    <div class="row g-2 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Username <span class="text-danger">*</span></label>
+                            <input type="text" name="username" class="form-control" required placeholder="e.g. edge_ai_lab">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold small">Password <span class="text-danger">*</span></label>
+                            <input type="password" name="password" class="form-control" required placeholder="Password">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-semibold">
+                        <i class="fa-solid fa-plus me-1"></i> Create Laboratory
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: RESET LAB PASSWORD -->
+<!-- ========================================================================= -->
+<div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark">
+                <h6 class="modal-title fw-bold"><i class="fa-solid fa-key me-1"></i> Reset Password</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('reset_lab_password') }}">
+                <input type="hidden" name="user_id" id="reset_user_id">
+                <div class="modal-body p-3">
+                    <p class="small text-muted mb-2">
+                        Resetting password for: <br>
+                        <strong id="reset_lab_name" class="text-dark"></strong> (<code id="reset_username"></code>)
+                    </p>
+                    <div class="mb-2">
+                        <label class="form-label fw-semibold small">New Password</label>
+                        <input type="password" name="new_password" class="form-control" required placeholder="Enter new password" minlength="4">
+                    </div>
+                </div>
+                <div class="modal-footer bg-light p-2">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning btn-sm fw-bold">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function populateEditModal(btn) {
+        document.getElementById('edit_lab_id').value = btn.getAttribute('data-lab-id');
+        document.getElementById('edit_lab_code').value = btn.getAttribute('data-lab-code');
+        document.getElementById('edit_lab_name').value = btn.getAttribute('data-lab-name');
+        document.getElementById('edit_room_no').value = btn.getAttribute('data-room-no');
+        document.getElementById('edit_incharge_name').value = btn.getAttribute('data-incharge');
+        document.getElementById('edit_description').value = btn.getAttribute('data-desc');
+    }
+
+    function populateResetPasswordModal(btn) {
+        document.getElementById('reset_user_id').value = btn.getAttribute('data-user-id');
+        document.getElementById('reset_username').textContent = btn.getAttribute('data-username');
+        document.getElementById('reset_lab_name').textContent = btn.getAttribute('data-lab-name');
+    }
+</script>
+{% endblock %}
