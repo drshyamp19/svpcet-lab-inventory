@@ -2,12 +2,12 @@ import os
 import io
 import json
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, date
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from database import (
-    get_db_connection, init_db,
+    get_db_connection, init_db, DB_PATH,
     get_user_by_username, get_user_by_id,
     get_all_labs, get_lab_by_id,
     update_lab, create_new_lab,
@@ -17,12 +17,14 @@ from excel_handler import (
     generate_components_excel_template,
     generate_students_excel_template,
     parse_components_file,
-    parse_students_file
+    parse_students_file,
+    export_transactions_to_excel
 )
 from whatsapp_service import (
     generate_issue_whatsapp_message,
     generate_batch_issue_whatsapp_message,
     generate_return_whatsapp_message,
+    generate_overdue_reminder_whatsapp_message,
     get_whatsapp_url,
     format_phone_number
 )
@@ -294,6 +296,7 @@ def dashboard():
 
     # Department-wide registered students
     total_students = conn.execute('SELECT COUNT(*) FROM students').fetchone()[0]
+    today_str = datetime.now().strftime("%Y-%m-%d")
 
     if is_master:
         # Aggregated stats across all labs
@@ -302,6 +305,19 @@ def dashboard():
         low_stock_items = conn.execute('SELECT * FROM components WHERE quantity <= min_alert_qty ORDER BY quantity ASC').fetchall()
         total_damaged = conn.execute('SELECT COALESCE(SUM(damaged_quantity), 0) FROM components').fetchone()[0]
         total_missing = conn.execute('SELECT COALESCE(SUM(missing_quantity), 0) FROM components').fetchone()[0]
+        overdue_items = conn.execute('''
+            SELECT t.*, c.name as component_name, c.unit,
+                   COALESCE(NULLIF(t.recipient_name, ''), s.name, 'N/A') as display_name,
+                   COALESCE(NULLIF(t.recipient_id_code, ''), s.roll_no, '') as display_id_code,
+                   COALESCE(NULLIF(t.recipient_phone, ''), s.phone, '') as display_phone,
+                   l.lab_name
+            FROM transactions t
+            JOIN components c ON t.component_id = c.id
+            LEFT JOIN students s ON t.student_id = s.id
+            LEFT JOIN labs l ON t.lab_id = l.id
+            WHERE t.status = 'ISSUED' AND t.expected_return_date != '' AND t.expected_return_date < ?
+            ORDER BY t.expected_return_date ASC
+        ''', (today_str,)).fetchall()
         recent_transactions = conn.execute('''
             SELECT t.*, c.name as component_name, c.unit, s.name as student_name, s.roll_no, s.phone as student_phone, l.lab_name
             FROM transactions t
@@ -318,6 +334,19 @@ def dashboard():
         low_stock_items = conn.execute('SELECT * FROM components WHERE lab_id = ? AND quantity <= min_alert_qty ORDER BY quantity ASC', (lab_id,)).fetchall()
         total_damaged = conn.execute('SELECT COALESCE(SUM(damaged_quantity), 0) FROM components WHERE lab_id = ?', (lab_id,)).fetchone()[0]
         total_missing = conn.execute('SELECT COALESCE(SUM(missing_quantity), 0) FROM components WHERE lab_id = ?', (lab_id,)).fetchone()[0]
+        overdue_items = conn.execute('''
+            SELECT t.*, c.name as component_name, c.unit,
+                   COALESCE(NULLIF(t.recipient_name, ''), s.name, 'N/A') as display_name,
+                   COALESCE(NULLIF(t.recipient_id_code, ''), s.roll_no, '') as display_id_code,
+                   COALESCE(NULLIF(t.recipient_phone, ''), s.phone, '') as display_phone,
+                   l.lab_name
+            FROM transactions t
+            JOIN components c ON t.component_id = c.id
+            LEFT JOIN students s ON t.student_id = s.id
+            LEFT JOIN labs l ON t.lab_id = l.id
+            WHERE t.lab_id = ? AND t.status = 'ISSUED' AND t.expected_return_date != '' AND t.expected_return_date < ?
+            ORDER BY t.expected_return_date ASC
+        ''', (lab_id, today_str)).fetchall()
         recent_transactions = conn.execute('''
             SELECT t.*, c.name as component_name, c.unit, s.name as student_name, s.roll_no, s.phone as student_phone, l.lab_name
             FROM transactions t
@@ -335,6 +364,8 @@ def dashboard():
         total_components=total_components,
         total_students=total_students,
         active_issues=active_issues,
+        overdue_count=len(overdue_items),
+        overdue_items=overdue_items,
         low_stock_count=len(low_stock_items),
         low_stock_items=low_stock_items,
         total_damaged=total_damaged,
@@ -771,6 +802,8 @@ def list_transactions():
     '''
     params = []
 
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
     if not is_master:
         query += ' AND t.lab_id = ?'
         params.append(get_current_lab_id())
@@ -778,6 +811,9 @@ def list_transactions():
     if status_filter:
         if status_filter == 'ISSUES':
             query += " AND t.status IN ('ALL_DAMAGED', 'ALL_MISSING', 'RETURNED_WITH_ISSUES')"
+        elif status_filter == 'OVERDUE':
+            query += " AND t.status = 'ISSUED' AND t.expected_return_date != '' AND t.expected_return_date < ?"
+            params.append(today_str)
         else:
             query += ' AND t.status = ?'
             params.append(status_filter)
@@ -873,7 +909,68 @@ def list_transactions():
             'date': item_data['date']
         }
         active_issues_map['components'].setdefault(cid, []).append(c_item_data)
-        
+
+    # Overdue count
+    overdue_count = conn.execute('''
+        SELECT COUNT(*) FROM transactions 
+        WHERE status = 'ISSUED' AND expected_return_date != '' AND expected_return_date < ?
+    ''' + ('' if is_master else ' AND lab_id = ?'), [today_str] + ([] if is_master else [get_current_lab_id()])).fetchone()[0]
+
+    # Damage / Defaulter history map for instant issue warning
+    damage_query = '''
+        SELECT t.id, t.recipient_type, t.student_id,
+               COALESCE(NULLIF(t.recipient_name, ''), s.name, '') as name,
+               COALESCE(NULLIF(t.recipient_id_code, ''), s.roll_no, '') as id_code,
+               t.component_id,
+               c.name as component_name,
+               t.quantity, c.unit,
+               t.returned_damaged_qty, t.returned_missing_qty,
+               t.damage_remarks, t.return_date, t.transaction_date,
+               l.lab_name
+        FROM transactions t
+        JOIN components c ON t.component_id = c.id
+        LEFT JOIN students s ON t.student_id = s.id
+        LEFT JOIN labs l ON t.lab_id = l.id
+        WHERE t.returned_damaged_qty > 0 
+           OR t.returned_missing_qty > 0 
+           OR t.status IN ('ALL_DAMAGED', 'ALL_MISSING', 'RETURNED_WITH_ISSUES')
+        ORDER BY t.return_date DESC, t.transaction_date DESC
+    '''
+    damage_rows = conn.execute(damage_query).fetchall()
+    damage_history_map = {
+        'students': {},
+        'staff': {},
+        'labs': {}
+    }
+    for dr in damage_rows:
+        dmg_data = {
+            'component_name': dr['component_name'],
+            'unit': dr['unit'],
+            'damaged_qty': dr['returned_damaged_qty'] or 0,
+            'missing_qty': dr['returned_missing_qty'] or 0,
+            'remarks': dr['damage_remarks'] or '',
+            'date': (dr['return_date'] or dr['transaction_date'] or '').split()[0],
+            'lab_name': dr['lab_name'] or 'Lab'
+        }
+        r_type = dr['recipient_type']
+        n_key = (dr['name'] or '').strip().lower()
+        c_key = (dr['id_code'] or '').strip().lower()
+        if r_type == 'STUDENT':
+            if dr['student_id']:
+                damage_history_map['students'].setdefault(f"id_{dr['student_id']}", []).append(dmg_data)
+            if n_key:
+                damage_history_map['students'].setdefault(f"name_{n_key}", []).append(dmg_data)
+            if c_key:
+                damage_history_map['students'].setdefault(f"code_{c_key}", []).append(dmg_data)
+        elif r_type == 'STAFF':
+            if n_key:
+                damage_history_map['staff'].setdefault(f"name_{n_key}", []).append(dmg_data)
+            if c_key:
+                damage_history_map['staff'].setdefault(f"code_{c_key}", []).append(dmg_data)
+        else:
+            if n_key:
+                damage_history_map['labs'].setdefault(f"name_{n_key}", []).append(dmg_data)
+
     conn.close()
     
     return render_template(
@@ -884,10 +981,13 @@ def list_transactions():
         staff_list=staff_list,
         labs_list=labs_list,
         active_issues_json=json.dumps(active_issues_map),
+        damage_history_json=json.dumps(damage_history_map),
         selected_status=status_filter,
         selected_recipient=recipient_filter,
         search=search,
         whatsapp_popup=whatsapp_popup,
+        today_str=today_str,
+        overdue_count=overdue_count,
         is_master=is_master
     )
 
@@ -994,6 +1094,107 @@ def transaction_report():
     )
 
 
+@app.route('/transactions/export-excel')
+@login_required
+def export_transactions_excel():
+    start_date = request.args.get('start_date', '').strip()
+    end_date = request.args.get('end_date', '').strip()
+    status_filter = request.args.get('status', '').strip()
+    recipient_filter = request.args.get('recipient_type', '').strip()
+    search = request.args.get('search', '').strip()
+    
+    conn = get_db_connection()
+    active_lab_id = session.get('active_lab_id', 1)
+    is_master = (active_lab_id == 'all' or active_lab_id == 0)
+
+    query = '''
+        SELECT t.*, c.name as component_name, c.unit, c.category, l.lab_name,
+               COALESCE(NULLIF(t.recipient_name, ''), s.name, 'N/A') as display_name,
+               COALESCE(NULLIF(t.recipient_id_code, ''), s.roll_no, '') as display_id_code,
+               COALESCE(NULLIF(t.recipient_dept, ''), s.department, '') as display_dept,
+               COALESCE(NULLIF(t.recipient_phone, ''), s.phone, '') as display_phone,
+               COALESCE(NULLIF(t.recipient_type, ''), 'STUDENT') as display_type
+        FROM transactions t
+        JOIN components c ON t.component_id = c.id
+        LEFT JOIN students s ON t.student_id = s.id
+        LEFT JOIN labs l ON t.lab_id = l.id
+        WHERE 1=1
+    '''
+    params = []
+
+    if not is_master:
+        query += ' AND t.lab_id = ?'
+        params.append(get_current_lab_id())
+
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    if status_filter:
+        if status_filter == 'ISSUES':
+            query += " AND t.status IN ('ALL_DAMAGED', 'ALL_MISSING', 'RETURNED_WITH_ISSUES')"
+        elif status_filter == 'OVERDUE':
+            query += " AND t.status = 'ISSUED' AND t.expected_return_date != '' AND t.expected_return_date < ?"
+            params.append(today_str)
+        else:
+            query += ' AND t.status = ?'
+            params.append(status_filter)
+
+    if recipient_filter:
+        query += " AND COALESCE(NULLIF(t.recipient_type, ''), 'STUDENT') = ?"
+        params.append(recipient_filter)
+
+    if start_date:
+        query += ' AND date(t.transaction_date) >= ?'
+        params.append(start_date)
+
+    if end_date:
+        query += ' AND date(t.transaction_date) <= ?'
+        params.append(end_date)
+
+    if search:
+        query += ''' AND (
+            t.recipient_name LIKE ? OR s.name LIKE ? OR 
+            t.recipient_id_code LIKE ? OR s.roll_no LIKE ? OR 
+            c.name LIKE ? OR t.purpose LIKE ?
+        )'''
+        params.extend([f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%', f'%{search}%'])
+
+    query += ' ORDER BY t.transaction_date DESC'
+    transactions = conn.execute(query, params).fetchall()
+
+    current_lab = get_lab_by_id(get_current_lab_id()) if not is_master else None
+    lab_display_name = current_lab['lab_name'] if current_lab else "All Laboratories (IIoT)"
+    conn.close()
+
+    excel_stream = export_transactions_to_excel(transactions, lab_display_name)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    filename = f"svpcet_transactions_{timestamp}.xlsx"
+
+    return send_file(
+        excel_stream,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
+
+@app.route('/admin/backup-database')
+@login_required
+def backup_database():
+    is_hod = (session.get('role') == 'HOD_ADMIN' or session.get('is_hod'))
+    if not is_hod:
+        flash('Access denied. Only Head of Department (HOD) Admin can download database backups.', 'danger')
+        return redirect(url_for('dashboard'))
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    download_filename = f"svpcet_lab_inventory_backup_{timestamp}.db"
+
+    return send_file(
+        DB_PATH,
+        as_attachment=True,
+        download_name=download_filename,
+        mimetype='application/x-sqlite3'
+    )
+
+
 # ==============================================================================
 # ISSUE COMPONENT (OUT)
 # ==============================================================================
@@ -1003,6 +1204,7 @@ def transaction_report():
 def issue_component():
     recipient_type = request.form.get('recipient_type', 'STUDENT').strip().upper()
     purpose = request.form.get('purpose', '').strip()
+    expected_return_date = request.form.get('expected_return_date', '').strip()
     lab_id = get_current_lab_id()
 
     conn = get_db_connection()
@@ -1172,12 +1374,12 @@ def issue_component():
             INSERT INTO transactions (
                 component_id, student_id, recipient_type, recipient_name,
                 recipient_id_code, recipient_dept, recipient_phone,
-                type, quantity, purpose, status, lab_id
+                type, quantity, purpose, status, expected_return_date, lab_id
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'OUT', ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'OUT', ?, ?, ?, ?, ?)
         ''', (cid, student_id, recipient_type, recipient_name,
               recipient_id_code, recipient_dept, final_phone,
-              qty, purpose, status, lab_id))
+              qty, purpose, status, expected_return_date, lab_id))
 
         issued_items_summary.append({
             'name': comp['name'],
@@ -1199,7 +1401,8 @@ def issue_component():
         purpose=purpose,
         recipient_type=recipient_type,
         dept=recipient_dept,
-        lab_name=lab_display_name
+        lab_name=lab_display_name,
+        expected_return_date=expected_return_date
     )
     wa_url = get_whatsapp_url(final_phone, wa_msg)
 

@@ -9,6 +9,9 @@
         <p class="text-muted mb-0">{{ active_lab.lab_name if active_lab else 'Laboratory' }} — Equipment Issue & Return tracking with instant WhatsApp receipts.</p>
     </div>
     <div class="col-md-6 text-md-end mt-3 mt-md-0 d-flex flex-wrap gap-2 justify-content-md-end">
+        <a href="{{ url_for('export_transactions_excel', **request.args) }}" class="btn btn-success btn-custom shadow-sm" title="Download Excel (.xlsx) Register for Lab Audits & NAAC">
+            <i class="fa-solid fa-file-excel me-1"></i> Export to Excel (.xlsx)
+        </a>
         <a href="{{ url_for('transaction_report') }}" target="_blank" class="btn btn-outline-dark btn-custom shadow-sm">
             <i class="fa-solid fa-print me-1"></i> Print Report / PDF
         </a>
@@ -31,6 +34,14 @@
             <li class="nav-item">
                 <a class="nav-link {% if selected_status == 'ISSUED' %}active bg-warning text-dark{% endif %}" href="{{ url_for('list_transactions', status='ISSUED', recipient_type=selected_recipient) }}">
                     <i class="fa-solid fa-clock me-1"></i> Pending Returns
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if selected_status == 'OVERDUE' %}active bg-danger text-white{% endif %}" href="{{ url_for('list_transactions', status='OVERDUE', recipient_type=selected_recipient) }}">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Overdue
+                    {% if overdue_count > 0 %}
+                        <span class="badge bg-white text-danger ms-1">{{ overdue_count }}</span>
+                    {% endif %}
                 </a>
             </li>
             <li class="nav-item">
@@ -173,9 +184,21 @@
                         </td>
                         <td>
                             {% if t.status == 'ISSUED' %}
-                                <span class="badge bg-warning text-dark px-2 py-1">
-                                    <i class="fa-solid fa-clock me-1"></i>Pending Return
-                                </span>
+                                {% if t.expected_return_date and t.expected_return_date < today_str %}
+                                    <span class="badge bg-danger text-white px-2 py-1 shadow-sm d-inline-block">
+                                        <i class="fa-solid fa-triangle-exclamation me-1"></i>OVERDUE
+                                    </span>
+                                    <div class="small text-danger fw-semibold mt-1">
+                                        <i class="fa-regular fa-calendar-xmark me-1"></i>Due: {{ t.expected_return_date }}
+                                    </div>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark px-2 py-1">
+                                        <i class="fa-solid fa-clock me-1"></i>Pending Return
+                                    </span>
+                                    {% if t.expected_return_date %}
+                                        <div class="small text-muted mt-1">Due: {{ t.expected_return_date }}</div>
+                                    {% endif %}
+                                {% endif %}
                             {% elif t.status == 'RETURNED' %}
                                 <span class="badge bg-success px-2 py-1">
                                     <i class="fa-solid fa-check-double me-1"></i>Returned ({{ t.returned_good_qty }} Good)
@@ -216,12 +239,19 @@
 
                                 {% if t.display_phone %}
                                     {% if t.status == 'ISSUED' %}
-                                        <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ 'COLLEGE COMPUTER LAB: Reminder for issued equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ '). Please return after session.' | urlencode }}"
-                                           target="_blank" class="btn btn-sm btn-outline-success" title="Send WhatsApp Message">
-                                            <i class="fa-brands fa-whatsapp"></i>
-                                        </a>
+                                        {% if t.expected_return_date and t.expected_return_date < today_str %}
+                                            <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ ('SVPCET IIoT LAB: Urgent reminder! Equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ ') issued to you was DUE on ' ~ t.expected_return_date ~ '. Please return to the lab immediately.') | urlencode }}"
+                                               target="_blank" class="btn btn-sm btn-danger text-white shadow-sm" title="Send Urgent Overdue Reminder via WhatsApp">
+                                                <i class="fa-brands fa-whatsapp me-1"></i> Remind
+                                            </a>
+                                        {% else %}
+                                            <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ ('SVPCET IIoT LAB: Reminder for issued equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ '). Please return on or before ' ~ (t.expected_return_date or 'due date') ~ '.') | urlencode }}"
+                                               target="_blank" class="btn btn-sm btn-outline-success" title="Send WhatsApp Reminder">
+                                                <i class="fa-brands fa-whatsapp"></i>
+                                            </a>
+                                        {% endif %}
                                     {% else %}
-                                        <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ 'COLLEGE COMPUTER LAB: Receipt for returned equipment ' ~ t.component_name ~ '. Thank you!' | urlencode }}"
+                                        <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ ('SVPCET IIoT LAB: Receipt for returned equipment ' ~ t.component_name ~ '. Thank you!') | urlencode }}"
                                            target="_blank" class="btn btn-sm btn-outline-secondary" title="Send WhatsApp Receipt">
                                             <i class="fa-brands fa-whatsapp"></i>
                                         </a>
@@ -303,6 +333,7 @@
                             <small id="phoneStatusBadge" class="d-block mt-1 text-muted">Auto-loaded or enter to save for WhatsApp receipt.</small>
                         </div>
                         <div class="col-12" id="studentActiveNoticeContainer" style="display: none;"></div>
+                        <div class="col-12" id="studentDamageNoticeContainer" style="display: none;"></div>
                     </div>
 
                     <!-- 2. SECTION: FACULTY / STAFF -->
@@ -343,6 +374,7 @@
                             <input type="text" id="staffIdCodeInput" name="staff_id_code" class="form-control" placeholder="e.g. EMP-101">
                         </div>
                         <div class="col-12" id="staffActiveNoticeContainer" style="display: none;"></div>
+                        <div class="col-12" id="staffDamageNoticeContainer" style="display: none;"></div>
                     </div>
 
                     <!-- 3. SECTION: OTHER LAB -->
@@ -383,15 +415,23 @@
                             <input type="text" id="labRoomNoInput" name="lab_room_no" class="form-control" placeholder="e.g. Lab 204, 2nd Floor">
                         </div>
                         <div class="col-12" id="labActiveNoticeContainer" style="display: none;"></div>
+                        <div class="col-12" id="labDamageNoticeContainer" style="display: none;"></div>
                     </div>
 
-                    <!-- Purpose / Session Details -->
-                    <div class="row g-2 mb-3">
-                        <div class="col-12">
+                    <!-- Purpose & Expected Return Date -->
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-7">
                             <label class="form-label fw-semibold">
                                 <i class="fa-solid fa-bullseye text-primary me-1"></i>Purpose / Session Details (उद्देश / प्रॅक्टिकल तपशील)
                             </label>
                             <input type="text" name="purpose" class="form-control" placeholder="e.g. Embedded Practical, IoT Sensor Lab, Semester Project">
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label fw-semibold text-danger">
+                                <i class="fa-solid fa-calendar-check text-danger me-1"></i>Expected Return Date (परत करण्याची मुदत) *
+                            </label>
+                            <input type="date" name="expected_return_date" id="expectedReturnDateInput" class="form-control" value="{{ today_str }}" required>
+                            <small class="text-muted">Default: आजची तारीख (किंवा प्रोजेक्टसाठी मुदत तारीख निवडा).</small>
                         </div>
                     </div>
 
@@ -609,6 +649,7 @@
 <script>
 document.addEventListener("DOMContentLoaded", function() {
     var activeIssuesData = {{ active_issues_json | safe }};
+    var damageHistoryData = {{ damage_history_json | safe }};
 
     function renderActiveNotice(containerId, items, titleSuffix) {
         var container = document.getElementById(containerId);
@@ -631,6 +672,32 @@ document.addEventListener("DOMContentLoaded", function() {
                     <i class="fa-solid fa-triangle-exclamation text-warning me-1"></i> आधीच सामान नेलेले आहे (Already Issued Items Pending Return):
                 </div>
                 <ul class="mb-0 ps-3 mt-1 text-dark">${listHtml}</ul>
+            </div>`;
+    }
+
+    function renderDamageNotice(containerId, items, titleSuffix) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+        if (!items || items.length === 0) {
+            container.style.display = "none";
+            container.innerHTML = "";
+            return;
+        }
+        var listHtml = items.map(function(it) {
+            var issues = [];
+            if (it.damaged_qty > 0) issues.push(`⚠️ ${it.damaged_qty} ${it.unit} Damaged`);
+            if (it.missing_qty > 0) issues.push(`❌ ${it.missing_qty} ${it.unit} Missing`);
+            var remarksText = it.remarks ? ` | Remark: "${it.remarks}"` : '';
+            return `<li><strong>${it.component_name}</strong> (${issues.join(', ')}) <span class="text-muted small">(${it.date ? 'Date: ' + it.date : ''}${remarksText} | ${it.lab_name})</span></li>`;
+        }).join('');
+        container.style.display = "block";
+        container.innerHTML = `
+            <div class="alert alert-danger py-2 px-3 mb-0 small border border-danger shadow-sm">
+                <div class="fw-bold text-danger">
+                    <i class="fa-solid fa-triangle-exclamation me-1"></i> Defaulter / Damage History Found (मागील नुकसान / गहाळ नोंद)!
+                </div>
+                <div class="small text-dark mb-1">या ${titleSuffix} कडे पूर्वीचे नुकसान नोंदवले गेले आहे. कृपया नवीन सामान देताना दक्षता बाळगा:</div>
+                <ul class="mb-0 ps-3 text-danger fw-semibold">${listHtml}</ul>
             </div>`;
     }
 
@@ -705,12 +772,16 @@ document.addEventListener("DOMContentLoaded", function() {
                     phoneBadge.className = 'd-block mt-1 text-muted';
                     var c = document.getElementById("studentActiveNoticeContainer");
                     if (c) c.style.display = "none";
+                    var cd = document.getElementById("studentDamageNoticeContainer");
+                    if (cd) cd.style.display = "none";
                     return;
                 }
                 var selectedOption = studentSelectEl.querySelector('option[value="' + value + '"]');
                 var roll = '';
+                var sName = '';
                 if (selectedOption) {
                     roll = (selectedOption.getAttribute('data-roll') || '').trim().toUpperCase();
+                    sName = (selectedOption.getAttribute('data-name') || '').trim().toLowerCase();
                     var phone = selectedOption.getAttribute('data-phone') || '';
                     var cleanPhone = phone.replace(/\D/g, '').slice(-10);
                     if (cleanPhone.length === 10) {
@@ -724,8 +795,11 @@ document.addEventListener("DOMContentLoaded", function() {
                         phoneInput.focus();
                     }
                 }
-                var pending = (activeIssuesData.students && (activeIssuesData.students[value] || activeIssuesData.students[roll])) || [];
+                var pending = (activeIssuesData.students && (activeIssuesData.students['id_' + value] || activeIssuesData.students['code_' + roll.toLowerCase()] || activeIssuesData.students[value] || activeIssuesData.students[roll])) || [];
                 renderActiveNotice("studentActiveNoticeContainer", pending, "विद्यार्थ्या");
+
+                var damages = (damageHistoryData.students && (damageHistoryData.students['id_' + value] || damageHistoryData.students['code_' + roll.toLowerCase()] || damageHistoryData.students['name_' + sName])) || [];
+                renderDamageNotice("studentDamageNoticeContainer", damages, "विद्यार्थ्या");
             }
         });
     }
@@ -751,16 +825,19 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (staffIdCodeInput) staffIdCodeInput.value = "";
                     var c = document.getElementById("staffActiveNoticeContainer");
                     if (c) c.style.display = "none";
+                    var cd = document.getElementById("staffDamageNoticeContainer");
+                    if (cd) cd.style.display = "none";
                     return;
                 }
                 var selectedOption = staffSelectEl.querySelector('option[value="' + CSS.escape(value) + '"]');
+                var sEmpId = '';
                 if (selectedOption) {
                     var phone = (selectedOption.getAttribute('data-phone') || '').replace(/\D/g, '').slice(-10);
                     var dept = selectedOption.getAttribute('data-dept') || '';
-                    var empid = selectedOption.getAttribute('data-empid') || '';
+                    sEmpId = (selectedOption.getAttribute('data-empid') || '').trim().toLowerCase();
                     if (phone) staffPhoneInput.value = phone;
                     if (dept && staffDeptInput) staffDeptInput.value = dept;
-                    if (empid && staffIdCodeInput) staffIdCodeInput.value = empid;
+                    if (sEmpId && staffIdCodeInput) staffIdCodeInput.value = sEmpId;
                     if (staffPhoneBadge) {
                         staffPhoneBadge.innerHTML = phone ? '<i class="fa-solid fa-circle-check text-success me-1"></i> Auto-filled from faculty records.' : '<i class="fa-solid fa-triangle-exclamation text-danger me-1"></i> Please enter 10-digit mobile number.';
                         staffPhoneBadge.className = phone ? 'd-block mt-1 text-success fw-semibold small' : 'd-block mt-1 text-danger fw-semibold small';
@@ -772,8 +849,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 }
                 var valKey = value.trim().toLowerCase();
-                var pending = (activeIssuesData.staff && activeIssuesData.staff[valKey]) || [];
+                var pending = (activeIssuesData.staff && (activeIssuesData.staff['name_' + valKey] || activeIssuesData.staff[valKey])) || [];
                 renderActiveNotice("staffActiveNoticeContainer", pending, "स्टाफ");
+
+                var staffDamages = (damageHistoryData.staff && (damageHistoryData.staff['name_' + valKey] || damageHistoryData.staff['code_' + sEmpId])) || [];
+                renderDamageNotice("staffDamageNoticeContainer", staffDamages, "स्टाफ");
             }
         });
     }
@@ -799,6 +879,8 @@ document.addEventListener("DOMContentLoaded", function() {
                     if (labRoomNoInput) labRoomNoInput.value = "";
                     var c = document.getElementById("labActiveNoticeContainer");
                     if (c) c.style.display = "none";
+                    var cd = document.getElementById("labDamageNoticeContainer");
+                    if (cd) cd.style.display = "none";
                     return;
                 }
                 var selectedOption = labSelectEl.querySelector('option[value="' + CSS.escape(value) + '"]');
@@ -820,8 +902,11 @@ document.addEventListener("DOMContentLoaded", function() {
                     }
                 }
                 var valKey = value.trim().toLowerCase();
-                var pending = (activeIssuesData.labs && activeIssuesData.labs[valKey]) || [];
+                var pending = (activeIssuesData.labs && (activeIssuesData.labs['name_' + valKey] || activeIssuesData.labs[valKey])) || [];
                 renderActiveNotice("labActiveNoticeContainer", pending, "लॅब");
+
+                var labDamages = (damageHistoryData.labs && damageHistoryData.labs['name_' + valKey]) || [];
+                renderDamageNotice("labDamageNoticeContainer", labDamages, "लॅब");
             }
         });
     }

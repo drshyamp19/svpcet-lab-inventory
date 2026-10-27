@@ -29,6 +29,28 @@
     </div>
 </div>
 
+<!-- Overdue Items Alert Banner -->
+{% if overdue_count > 0 %}
+<div class="alert alert-danger border-danger shadow-sm d-flex flex-wrap align-items-center justify-content-between p-3 mb-4 rounded-3">
+    <div class="d-flex align-items-center gap-3">
+        <div class="p-3 bg-danger bg-opacity-10 text-danger rounded-circle">
+            <i class="fa-solid fa-triangle-exclamation fa-2xl"></i>
+        </div>
+        <div>
+            <h5 class="fw-bold text-danger mb-1">
+                {{ overdue_count }} Equipment Issue(s) are OVERDUE (परत करण्याची मुदत उलटून गेली आहे)!
+            </h5>
+            <div class="small text-dark">
+                विद्यार्थी/स्टाफकडून साहित्य परत येण्याची मुदत संपली आहे. त्वरित विद्यार्थ्यांशी संपर्क करून किंवा WhatsApp Reminder पाठवून साहित्य जमा करून घ्या.
+            </div>
+        </div>
+    </div>
+    <a href="{{ url_for('list_transactions', status='OVERDUE') }}" class="btn btn-danger btn-sm fw-bold px-3 py-2 shadow-sm mt-2 mt-md-0">
+        <i class="fa-solid fa-clock-rotate-left me-1"></i> View Overdue Items ({{ overdue_count }}) <i class="fa-solid fa-arrow-right ms-1"></i>
+    </a>
+</div>
+{% endif %}
+
 
 <!-- Stat Cards -->
 <div class="row g-3 mb-4">
@@ -71,7 +93,12 @@
             <div class="d-flex justify-content-between align-items-center">
                 <div>
                     <h6 class="text-muted fw-normal mb-1">Active Issues (Pending)</h6>
-                    <h3 class="fw-bold mb-0 text-warning">{{ active_issues }}</h3>
+                    <h3 class="fw-bold mb-0 text-warning">
+                        {{ active_issues }}
+                        {% if overdue_count > 0 %}
+                            <span class="badge bg-danger fs-6 ms-1" title="{{ overdue_count }} items overdue">{{ overdue_count }} Overdue</span>
+                        {% endif %}
+                    </h3>
                 </div>
                 <div class="p-3 bg-warning bg-opacity-10 text-warning rounded-circle">
                     <i class="fa-solid fa-clock-rotate-left fa-xl"></i>

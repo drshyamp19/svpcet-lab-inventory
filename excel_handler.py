@@ -249,3 +249,119 @@ def parse_students_file(file_storage):
             })
 
     return records
+
+
+def export_transactions_to_excel(transactions_list, lab_name="All Laboratories"):
+    """
+    Generate a beautifully styled Excel workbook containing complete transaction records
+    suitable for official college lab audits, NAAC/NBA verification, and inventory registers.
+    """
+    from datetime import datetime
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Transactions Register"
+
+    # Title Banner Block
+    ws.merge_cells('A1:P1')
+    ws['A1'] = "ST. VINCENT PALLOTTI COLLEGE OF ENGINEERING & TECHNOLOGY, NAGPUR"
+    ws['A1'].font = Font(name="Calibri", size=14, bold=True, color="1F4E79")
+    ws['A1'].alignment = Alignment(horizontal="center", vertical="center")
+
+    ws.merge_cells('A2:P2')
+    ws['A2'] = f"Department of Industrial IoT — {lab_name} | Equipment Issue & Return Register"
+    ws['A2'].font = Font(name="Calibri", size=11, bold=True, color="404040")
+    ws['A2'].alignment = Alignment(horizontal="center", vertical="center")
+
+    ws.merge_cells('A3:P3')
+    ws['A3'] = f"Generated On: {datetime.now().strftime('%d-%m-%Y %I:%M %p')} | Total Records: {len(transactions_list)}"
+    ws['A3'].font = Font(name="Calibri", size=10, italic=True, color="7F7F7F")
+    ws['A3'].alignment = Alignment(horizontal="center", vertical="center")
+
+    headers = [
+        "Trans ID", "Date & Time", "Laboratory", "Recipient Type",
+        "Recipient Name", "UID / Roll / ID", "Department", "Contact Phone",
+        "Component Name", "Qty", "Unit", "Purpose",
+        "Status", "Expected Return", "Actual Return", "Return Remarks / Issues"
+    ]
+    ws.append([]) # Empty row 4
+    ws.append(headers) # Row 5
+
+    header_row = 5
+    header_fill = PatternFill(start_color="1F4E79", end_color="1F4E79", fill_type="solid")
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    thin_border = Border(
+        left=Side(style='thin', color='D9D9D9'),
+        right=Side(style='thin', color='D9D9D9'),
+        top=Side(style='thin', color='D9D9D9'),
+        bottom=Side(style='thin', color='D9D9D9')
+    )
+
+    for cell in ws[header_row]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    alt_fill = PatternFill(start_color="F7F9FC", end_color="F7F9FC", fill_type="solid")
+
+    for idx, t in enumerate(transactions_list, start=1):
+        def _get(key, fallback=""):
+            try:
+                v = t[key]
+                return v if v is not None else fallback
+            except Exception:
+                return fallback
+
+        r_type = _get('recipient_type') or _get('display_type') or 'STUDENT'
+        r_name = _get('recipient_name') or _get('display_name') or 'N/A'
+        r_code = _get('recipient_id_code') or _get('display_id_code') or ''
+        r_dept = _get('recipient_dept') or _get('display_dept') or ''
+        r_phone = _get('recipient_phone') or _get('display_phone') or ''
+        c_name = _get('component_name') or ''
+        qty = _get('quantity', 0)
+        unit = _get('unit', 'Nos')
+        purpose = _get('purpose', '')
+        status = _get('status', 'ISSUED')
+        exp_date = _get('expected_return_date', '')
+        ret_date = _get('return_date', '')
+        remarks = _get('damage_remarks') or _get('remarks') or ''
+        
+        dmg = _get('returned_damaged_qty', 0)
+        mis = _get('returned_missing_qty', 0)
+        if dmg or mis:
+            issues = []
+            if dmg: issues.append(f"Damaged: {dmg}")
+            if mis: issues.append(f"Missing: {mis}")
+            remarks = f"[{', '.join(issues)}] {remarks}".strip()
+
+        lab = _get('lab_name', lab_name)
+        dt = _get('transaction_date', '')
+
+        row_data = [
+            _get('id'), dt, lab, r_type,
+            r_name, r_code, r_dept, r_phone,
+            c_name, qty, unit, purpose,
+            status, exp_date, ret_date, remarks
+        ]
+        ws.append(row_data)
+        current_row = ws.max_row
+        for col_num in range(1, len(row_data) + 1):
+            c = ws.cell(row=current_row, column=col_num)
+            c.border = thin_border
+            if idx % 2 == 0:
+                c.fill = alt_fill
+            c.alignment = Alignment(vertical="center")
+            if col_num in [1, 10, 14, 15]:
+                c.alignment = Alignment(horizontal="center", vertical="center")
+
+    # Column Auto-Width
+    for col in ws.columns:
+        if col[0].row > 3:
+            max_len = max(len(str(cell.value or '')) for cell in col if cell.row >= header_row)
+            col_letter = openpyxl.utils.get_column_letter(col[0].column)
+            ws.column_dimensions[col_letter].width = max(min(max_len + 4, 38), 12)
+
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output

@@ -177,6 +177,13 @@
                                         <i class="fa-solid fa-key me-2 text-secondary"></i> Change Password
                                     </button>
                                 </li>
+                                {% if is_hod %}
+                                <li>
+                                    <a class="dropdown-item rounded" href="{{ url_for('backup_database') }}">
+                                        <i class="fa-solid fa-database me-2 text-primary"></i> Download DB Backup (.db)
+                                    </a>
+                                </li>
+                                {% endif %}
                                 <li><hr class="dropdown-divider"></li>
                                 <li>
                                     <a class="dropdown-item rounded text-danger" href="{{ url_for('logout') }}">

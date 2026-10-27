@@ -72,6 +72,7 @@ def init_db():
             returned_missing_qty INTEGER DEFAULT 0,
             damage_remarks TEXT,
             transaction_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            expected_return_date TEXT,
             return_date TIMESTAMP,
             remarks TEXT,
             FOREIGN KEY (component_id) REFERENCES components (id),
@@ -128,8 +129,15 @@ def init_db():
     add_col_if_not_exists('transactions', 'recipient_id_code', 'TEXT DEFAULT ""')
     add_col_if_not_exists('transactions', 'recipient_dept', 'TEXT DEFAULT ""')
     add_col_if_not_exists('transactions', 'recipient_phone', 'TEXT DEFAULT ""')
+    add_col_if_not_exists('transactions', 'expected_return_date', 'TEXT DEFAULT ""')
     add_col_if_not_exists('transactions', 'lab_id', 'INTEGER DEFAULT 1')
     add_col_if_not_exists('students', 'academic_year', 'TEXT DEFAULT "2026-2027"')
+
+    # Performance Indexes
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_transactions_lab_status ON transactions (lab_id, status)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_transactions_student ON transactions (student_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_transactions_comp ON transactions (component_id)')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_components_lab ON components (lab_id)')
 
     # 6. Labs Table (Multi-Lab Management)
     cursor.execute('''

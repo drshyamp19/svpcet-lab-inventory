@@ -14,7 +14,7 @@ def format_phone_number(phone):
         return "91" + digits[1:]
     return digits
 
-def generate_issue_whatsapp_message(recipient_name, recipient_id, component_name, quantity, unit, purpose, recipient_type="STUDENT", dept=""):
+def generate_issue_whatsapp_message(recipient_name, recipient_id, component_name, quantity, unit, purpose, recipient_type="STUDENT", dept="", expected_return_date=None):
     """Create a formatted WhatsApp receipt message for a single issued item."""
     return generate_batch_issue_whatsapp_message(
         recipient_name=recipient_name,
@@ -22,10 +22,11 @@ def generate_issue_whatsapp_message(recipient_name, recipient_id, component_name
         items_list=[{'name': component_name, 'quantity': quantity, 'unit': unit}],
         purpose=purpose,
         recipient_type=recipient_type,
-        dept=dept
+        dept=dept,
+        expected_return_date=expected_return_date
     )
 
-def generate_batch_issue_whatsapp_message(recipient_name, recipient_id, items_list, purpose, recipient_type="STUDENT", dept="", lab_name="Embedded Systems Laboratory"):
+def generate_batch_issue_whatsapp_message(recipient_name, recipient_id, items_list, purpose, recipient_type="STUDENT", dept="", lab_name="Embedded Systems Laboratory", expected_return_date=None):
     """Create a formatted WhatsApp receipt message for one or multiple issued items."""
     now_str = datetime.now().strftime("%d-%m-%Y %I:%M %p")
     dept_header = lab_name.upper() if lab_name else "EMBEDDED SYSTEMS LAB"
@@ -52,16 +53,20 @@ def generate_batch_issue_whatsapp_message(recipient_name, recipient_id, items_li
             items_block += f"  {idx}. *{it['name']}* — {it['quantity']} {it['unit']}\n"
         items_block = items_block.rstrip()
 
+    date_block = f"📅 *Issue Date & Time:* {now_str}\n"
+    if expected_return_date:
+        date_block += f"⏳ *Expected Return Date:* {expected_return_date}\n"
+
     msg = (
         f"🏛 *{title}*\n\n"
         f"{greeting}\n\n"
         f"{salutation}\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
         f"{items_block}\n"
-        f"📅 *Date & Time:* {now_str}\n"
+        f"{date_block}"
         f"🎯 *Purpose:* {purpose or 'Embedded Systems / IoT Practical'}\n"
         f"━━━━━━━━━━━━━━━━━━━\n\n"
-        f"⚠️ *Note:* Please handle components carefully and return after practical session.\n\n"
+        f"⚠️ *Note:* Please handle components carefully and return on or before the due date.\n\n"
         f"— *{lab_name}, Dept. of Industrial IoT*\n"
         f"*St. Vincent Pallotti College of Engg. & Tech., Nagpur*"
     )
@@ -106,6 +111,28 @@ def generate_return_whatsapp_message(recipient_name, recipient_id, component_nam
         f"━━━━━━━━━━━━━━━━━━━\n\n"
         f"Thank you for using the Embedded Systems Lab facilities.\n\n"
         f"— *Embedded Systems Lab, Dept. of Industrial IoT*\n"
+        f"*St. Vincent Pallotti College of Engg. & Tech., Nagpur*"
+    )
+    return msg
+
+def generate_overdue_reminder_whatsapp_message(recipient_name, recipient_id, component_name, quantity, unit, expected_return_date, lab_name="Embedded Systems Laboratory"):
+    """Create an urgent WhatsApp reminder for overdue laboratory equipment."""
+    title = f"SVPCET NAGPUR (IIoT) - OVERDUE EQUIPMENT REMINDER"
+    greeting = f"Attention: *{recipient_name}*"
+    if recipient_id:
+        greeting += f" (UID/ID: *{recipient_id}*)"
+
+    msg = (
+        f"🏛 *{title}*\n\n"
+        f"{greeting},\n\n"
+        f"⚠️ This is an urgent reminder that the following laboratory equipment is currently *OVERDUE* for return:\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📦 *Item:* {component_name}\n"
+        f"🔢 *Quantity:* {quantity} {unit}\n"
+        f"⏰ *Due Date was:* {expected_return_date or 'Immediate'}\n"
+        f"━━━━━━━━━━━━━━━━━━━\n\n"
+        f"Please return this equipment to the *{lab_name}* immediately to ensure availability for other students.\n\n"
+        f"— *{lab_name}, Dept. of Industrial IoT*\n"
         f"*St. Vincent Pallotti College of Engg. & Tech., Nagpur*"
     )
     return msg
