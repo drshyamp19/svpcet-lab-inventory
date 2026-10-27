@@ -2,7 +2,14 @@ import os
 import io
 import json
 from functools import wraps
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
+
+# Indian Standard Time (IST) = UTC + 05:30
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_ist_now():
+    """Return current datetime in Indian Standard Time (IST)."""
+    return datetime.now(IST)
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -299,7 +306,7 @@ def dashboard():
 
     # Department-wide registered students
     total_students = conn.execute('SELECT COUNT(*) FROM students').fetchone()[0]
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = get_ist_now().strftime("%Y-%m-%d")
 
     if is_master:
         # Aggregated stats across all labs
@@ -805,7 +812,7 @@ def list_transactions():
     '''
     params = []
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = get_ist_now().strftime("%Y-%m-%d")
 
     if not is_master:
         query += ' AND t.lab_id = ?'
@@ -1073,7 +1080,7 @@ def transaction_report():
     staff_txns_count = sum(1 for t in transactions if t['display_type'] == 'STAFF')
     lab_txns_count = sum(1 for t in transactions if t['display_type'] == 'OTHER_LAB')
     
-    current_time = datetime.now().strftime("%d-%m-%Y %I:%M %p")
+    current_time = get_ist_now().strftime("%d-%m-%Y %I:%M %p")
     conn.close()
     
     return render_template(
@@ -1131,7 +1138,7 @@ def export_transactions_excel():
         query += ' AND t.lab_id = ?'
         params.append(get_current_lab_id())
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    today_str = get_ist_now().strftime("%Y-%m-%d")
     if status_filter:
         if status_filter == 'ISSUES':
             query += " AND t.status IN ('ALL_DAMAGED', 'ALL_MISSING', 'RETURNED_WITH_ISSUES')"
@@ -1170,7 +1177,7 @@ def export_transactions_excel():
     conn.close()
 
     excel_stream = export_transactions_to_excel(transactions, lab_display_name)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    timestamp = get_ist_now().strftime("%Y%m%d_%H%M")
     filename = f"svpcet_transactions_{timestamp}.xlsx"
 
     return send_file(
@@ -1189,7 +1196,7 @@ def backup_database():
         flash('Access denied. Only Head of Department (HOD) Admin can download database backups.', 'danger')
         return redirect(url_for('dashboard'))
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = get_ist_now().strftime("%Y%m%d_%H%M%S")
     download_filename = f"svpcet_lab_inventory_backup_{timestamp}.db"
 
     return send_file(
@@ -1375,17 +1382,18 @@ def issue_component():
         # 1. Deduct stock
         conn.execute('UPDATE components SET quantity = quantity - ? WHERE id = ?', (qty, cid))
 
-        # 2. Insert transaction
+        # 2. Insert transaction with Indian Standard Time (IST)
+        ist_now_str = get_ist_now().strftime("%Y-%m-%d %H:%M:%S")
         conn.execute('''
             INSERT INTO transactions (
                 component_id, student_id, recipient_type, recipient_name,
                 recipient_id_code, recipient_dept, recipient_phone,
-                type, quantity, purpose, status, expected_return_date, lab_id
+                type, quantity, purpose, status, expected_return_date, lab_id, transaction_date
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'OUT', ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'OUT', ?, ?, ?, ?, ?, ?)
         ''', (cid, student_id, recipient_type, recipient_name,
               recipient_id_code, recipient_dept, final_phone,
-              qty, purpose, status, expected_return_date, lab_id))
+              qty, purpose, status, expected_return_date, lab_id, ist_now_str))
 
         issued_items_summary.append({
             'name': comp['name'],
@@ -1491,6 +1499,7 @@ def return_component(id):
     if missing_qty > 0:
         conn.execute('UPDATE components SET missing_quantity = missing_quantity + ? WHERE id = ?', (missing_qty, txn['component_id']))
 
+    ist_now_str = get_ist_now().strftime("%Y-%m-%d %H:%M:%S")
     conn.execute('''
         UPDATE transactions
         SET status = ?,
@@ -1499,9 +1508,9 @@ def return_component(id):
             returned_damaged_qty = ?,
             returned_missing_qty = ?,
             damage_remarks = ?,
-            return_date = CURRENT_TIMESTAMP
+            return_date = ?
         WHERE id = ?
-    ''', (status, good_qty, consumed_qty, damaged_qty, missing_qty, damage_remarks, id))
+    ''', (status, good_qty, consumed_qty, damaged_qty, missing_qty, damage_remarks, ist_now_str, id))
     
     conn.commit()
     

@@ -2,6 +2,14 @@ import io
 import csv
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from datetime import datetime, timezone, timedelta
+
+# Indian Standard Time (IST) = UTC + 05:30
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_ist_now():
+    return datetime.now(IST)
+
 
 def generate_components_excel_template():
     wb = openpyxl.Workbook()
@@ -256,7 +264,7 @@ def export_transactions_to_excel(transactions_list, lab_name="All Laboratories")
     Generate a beautifully styled Excel workbook containing complete transaction records
     suitable for official college lab audits, NAAC/NBA verification, and inventory registers.
     """
-    from datetime import datetime
+
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -274,7 +282,7 @@ def export_transactions_to_excel(transactions_list, lab_name="All Laboratories")
     ws['A2'].alignment = Alignment(horizontal="center", vertical="center")
 
     ws.merge_cells('A3:P3')
-    ws['A3'] = f"Generated On: {datetime.now().strftime('%d-%m-%Y %I:%M %p')} | Total Records: {len(transactions_list)}"
+    ws['A3'] = f"Generated On: {get_ist_now().strftime('%d-%m-%Y %I:%M %p')} | Total Records: {len(transactions_list)}"
     ws['A3'].font = Font(name="Calibri", size=10, italic=True, color="7F7F7F")
     ws['A3'].alignment = Alignment(horizontal="center", vertical="center")
 

@@ -1,5 +1,12 @@
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
+
+# Indian Standard Time (IST) = UTC + 05:30
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_ist_now():
+    """Return current datetime in Indian Standard Time (IST)."""
+    return datetime.now(IST)
 
 def format_phone_number(phone):
     """Clean and format Indian mobile number with 91 country code."""
@@ -28,7 +35,7 @@ def generate_issue_whatsapp_message(recipient_name, recipient_id, component_name
 
 def generate_batch_issue_whatsapp_message(recipient_name, recipient_id, items_list, purpose, recipient_type="STUDENT", dept="", lab_name="Embedded Systems Laboratory", expected_return_date=None):
     """Create a formatted WhatsApp receipt message for one or multiple issued items."""
-    now_str = datetime.now().strftime("%d-%m-%Y %I:%M %p")
+    now_str = get_ist_now().strftime("%d-%m-%Y %I:%M %p")
     dept_header = lab_name.upper() if lab_name else "EMBEDDED SYSTEMS LAB"
     
     if recipient_type == "STAFF":
@@ -74,7 +81,7 @@ def generate_batch_issue_whatsapp_message(recipient_name, recipient_id, items_li
 
 def generate_return_whatsapp_message(recipient_name, recipient_id, component_name, total_qty, unit, good_qty, damaged_qty, missing_qty, remarks, recipient_type="STUDENT", dept="", consumed_qty=0):
     """Create a formatted WhatsApp receipt message for returned items."""
-    now_str = datetime.now().strftime("%d-%m-%Y %I:%M %p")
+    now_str = get_ist_now().strftime("%d-%m-%Y %I:%M %p")
     breakdown = ""
     if good_qty > 0:
         breakdown += f"  • ✅ Working / Good Condition: {good_qty} {unit}\n"

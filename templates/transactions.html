@@ -980,17 +980,20 @@ document.addEventListener("DOMContentLoaded", function() {
         });
     }
 
-    // 6. Dynamic Multi-Component Cart Management
+    // 6. Dynamic Multi-Component Cart Management with Searchable TomSelect
     var itemsTableBody = document.getElementById("issueItemsTableBody");
     var btnAddItemRow = document.getElementById("btnAddItemRow");
     var cartCountBadge = document.getElementById("cartCountBadge");
     var totalCartSummary = document.getElementById("totalCartSummary");
 
+    // Save initial clean options HTML for creating new rows
+    var initialCompSelectEl = itemsTableBody ? itemsTableBody.querySelector(".comp-select") : null;
+    var rawCompOptionsHtml = initialCompSelectEl ? initialCompSelectEl.innerHTML : "";
+
     function updateRowDetails(row) {
         var compSelect = row.querySelector(".comp-select");
         var qtyInput = row.querySelector(".comp-qty");
         var unitBadge = row.querySelector(".unit-badge");
-        var consumableSelect = row.querySelector(".comp-consumable");
         var stockInfoDiv = row.querySelector(".row-stock-info");
         var stockAvailSpan = row.querySelector(".stock-avail-text");
         var holderNoticeSpan = row.querySelector(".holder-notice-inline");
@@ -1003,11 +1006,11 @@ document.addEventListener("DOMContentLoaded", function() {
             return;
         }
 
-        var opt = compSelect.options[compSelect.selectedIndex];
-        var avail = parseInt(opt.getAttribute("data-avail") || "0", 10);
-        var unit = opt.getAttribute("data-unit") || "Unit";
-        var cat = opt.getAttribute("data-category") || "";
         var compId = compSelect.value;
+        var opt = compSelect.querySelector('option[value="' + CSS.escape(compId) + '"]');
+        var avail = opt ? parseInt(opt.getAttribute("data-avail") || "0", 10) : 0;
+        var unit = opt ? (opt.getAttribute("data-unit") || "Unit") : "Unit";
+        var cat = opt ? (opt.getAttribute("data-category") || "") : "";
 
         if (unitBadge) unitBadge.innerText = unit;
         if (qtyInput) {
@@ -1016,7 +1019,6 @@ document.addEventListener("DOMContentLoaded", function() {
                 qtyInput.value = avail;
             }
         }
-        // Consumables also track for return and reuse; do not auto-force to immediate consume
 
         if (stockInfoDiv && stockAvailSpan) {
             stockInfoDiv.style.display = "block";
@@ -1034,6 +1036,22 @@ document.addEventListener("DOMContentLoaded", function() {
         }
 
         updateCartTotals();
+    }
+
+    function initSearchableCompSelect(row) {
+        var select = row.querySelector(".comp-select");
+        if (!select || select.tomselect) return;
+
+        new TomSelect(select, {
+            create: false,
+            sortField: { field: "text", direction: "asc" },
+            placeholder: "🔍 Type to search component (नाव टाईप करा)...",
+            dropdownParent: 'body',
+            maxOptions: 250,
+            onChange: function(value) {
+                updateRowDetails(row);
+            }
+        });
     }
 
     function updateCartTotals() {
@@ -1084,6 +1102,8 @@ document.addEventListener("DOMContentLoaded", function() {
             removeBtn.addEventListener("click", function() {
                 var rows = itemsTableBody.querySelectorAll(".item-row");
                 if (rows.length > 1) {
+                    var s = row.querySelector(".comp-select");
+                    if (s && s.tomselect) s.tomselect.destroy();
                     row.remove();
                     updateCartTotals();
                 }
@@ -1094,31 +1114,49 @@ document.addEventListener("DOMContentLoaded", function() {
     if (itemsTableBody && btnAddItemRow) {
         // Initialize initial row
         var initialRow = itemsTableBody.querySelector(".item-row");
-        if (initialRow) attachRowListeners(initialRow);
+        if (initialRow) {
+            initSearchableCompSelect(initialRow);
+            attachRowListeners(initialRow);
+        }
 
         btnAddItemRow.addEventListener("click", function() {
-            var firstRow = itemsTableBody.querySelector(".item-row");
-            if (!firstRow) return;
-
-            var newRow = firstRow.cloneNode(true);
-            var select = newRow.querySelector(".comp-select");
-            var qty = newRow.querySelector(".comp-qty");
-            var unit = newRow.querySelector(".unit-badge");
-            var cons = newRow.querySelector(".comp-consumable");
-            var stockDiv = newRow.querySelector(".row-stock-info");
-            var holderNotice = newRow.querySelector(".holder-notice-inline");
-
-            if (select) select.value = "";
-            if (qty) { qty.value = 1; qty.removeAttribute("max"); }
-            if (unit) unit.innerText = "Unit";
-            if (cons) cons.value = "no";
-            if (stockDiv) stockDiv.style.display = "none";
-            if (holderNotice) holderNotice.innerHTML = "";
-
-            itemsTableBody.appendChild(newRow);
-            attachRowListeners(newRow);
+            var tr = document.createElement("tr");
+            tr.className = "item-row";
+            tr.innerHTML = `
+                <td>
+                    <select name="component_ids[]" class="form-select comp-select" required>
+                        ${rawCompOptionsHtml}
+                    </select>
+                    <div class="row-stock-info small mt-1" style="display:none;">
+                        <span class="badge bg-light text-dark border">
+                            <i class="fa-solid fa-cubes me-1 text-primary"></i>
+                            <span class="stock-avail-text">0</span>
+                        </span>
+                        <span class="holder-notice-inline ms-1"></span>
+                    </div>
+                </td>
+                <td>
+                    <div class="input-group">
+                        <input type="number" name="quantities[]" class="form-control comp-qty" min="1" value="1" required>
+                        <span class="input-group-text bg-light text-muted unit-badge small" style="min-width: 50px;">Unit</span>
+                    </div>
+                </td>
+                <td>
+                    <select name="is_consumables[]" class="form-select comp-consumable">
+                        <option value="no" selected>Track for Return (पुन्हा जमा होणार)</option>
+                        <option value="yes">Immediate Consume (थेट खर्च)</option>
+                    </select>
+                </td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-row-btn" title="Remove row">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </td>
+            `;
+            itemsTableBody.appendChild(tr);
+            initSearchableCompSelect(tr);
+            attachRowListeners(tr);
             updateCartTotals();
-            if (select) select.focus();
         });
     }
 

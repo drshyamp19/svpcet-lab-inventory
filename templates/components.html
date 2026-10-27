@@ -68,7 +68,7 @@
                         <th class="text-end">Actions</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="componentsTableBody">
                     {% for c in components %}
                     <tr>
                         <td>
@@ -411,4 +411,23 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    var searchInput = document.getElementById("componentLiveSearch");
+    var tbody = document.getElementById("componentsTableBody");
+    if (searchInput && tbody) {
+        searchInput.addEventListener("input", function() {
+            var q = this.value.toLowerCase().trim();
+            var rows = tbody.querySelectorAll("tr");
+            rows.forEach(function(r) {
+                var text = r.textContent.toLowerCase();
+                r.style.display = (!q || text.indexOf(q) !== -1) ? "" : "none";
+            });
+        });
+    }
+});
+</script>
 {% endblock %}
