@@ -72,16 +72,29 @@ def generate_batch_issue_whatsapp_message(recipient_name, recipient_id, items_li
     )
     return msg
 
-def generate_return_whatsapp_message(recipient_name, recipient_id, component_name, total_qty, unit, good_qty, damaged_qty, missing_qty, remarks, recipient_type="STUDENT", dept=""):
+def generate_return_whatsapp_message(recipient_name, recipient_id, component_name, total_qty, unit, good_qty, damaged_qty, missing_qty, remarks, recipient_type="STUDENT", dept="", consumed_qty=0):
     """Create a formatted WhatsApp receipt message for returned items."""
     now_str = datetime.now().strftime("%d-%m-%Y %I:%M %p")
-    breakdown = f"  • Working/Good: {good_qty} {unit}\n"
+    breakdown = ""
+    if good_qty > 0:
+        breakdown += f"  • ✅ Working / Good Condition: {good_qty} {unit}\n"
+    if consumed_qty > 0:
+        breakdown += f"  • 📦 Consumed / Used in Practical: {consumed_qty} {unit}\n"
     if damaged_qty > 0:
         breakdown += f"  • ⚠️ Damaged: {damaged_qty} {unit}\n"
     if missing_qty > 0:
-        breakdown += f"  • ❌ Missing/Lost: {missing_qty} {unit}\n"
+        breakdown += f"  • ❌ Missing / Lost: {missing_qty} {unit}\n"
+    if not breakdown:
+        breakdown = f"  • Working / Good: {good_qty} {unit}\n"
 
-    status_str = "Returned in Full Good Condition" if (damaged_qty == 0 and missing_qty == 0) else "Returned with Issues / Defect Recorded"
+    if damaged_qty == 0 and missing_qty == 0 and consumed_qty == 0:
+        status_str = "Returned in Full Good Condition"
+    elif consumed_qty == total_qty:
+        status_str = "Fully Consumed in Practical / Lab"
+    elif damaged_qty > 0 or missing_qty > 0:
+        status_str = "Returned with Issues / Defect Recorded"
+    else:
+        status_str = "Acknowledged / Partially Returned & Consumed"
 
     if recipient_type == "STAFF":
         title = "SVPCET NAGPUR (IIoT) - EMBEDDED SYSTEMS LAB RETURN RECEIPT"

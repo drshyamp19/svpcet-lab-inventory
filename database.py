@@ -68,6 +68,7 @@ def init_db():
             purpose TEXT,
             status TEXT NOT NULL, -- 'ISSUED', 'RETURNED', 'DAMAGED', 'MISSING', 'RETURNED_WITH_ISSUES', 'CONSUMED'
             returned_good_qty INTEGER DEFAULT 0,
+            returned_consumed_qty INTEGER DEFAULT 0,
             returned_damaged_qty INTEGER DEFAULT 0,
             returned_missing_qty INTEGER DEFAULT 0,
             damage_remarks TEXT,
@@ -121,6 +122,7 @@ def init_db():
     add_col_if_not_exists('components', 'unit_price', 'REAL DEFAULT 0.0')
     add_col_if_not_exists('components', 'lab_id', 'INTEGER DEFAULT 1')
     add_col_if_not_exists('transactions', 'returned_good_qty', 'INTEGER DEFAULT 0')
+    add_col_if_not_exists('transactions', 'returned_consumed_qty', 'INTEGER DEFAULT 0')
     add_col_if_not_exists('transactions', 'returned_damaged_qty', 'INTEGER DEFAULT 0')
     add_col_if_not_exists('transactions', 'returned_missing_qty', 'INTEGER DEFAULT 0')
     add_col_if_not_exists('transactions', 'damage_remarks', 'TEXT')

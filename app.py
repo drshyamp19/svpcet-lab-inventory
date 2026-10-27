@@ -1061,6 +1061,7 @@ def transaction_report():
     total_txns = len(transactions)
     total_issued_qty = sum(t['quantity'] for t in transactions)
     total_good_returned = sum(t['returned_good_qty'] or 0 for t in transactions)
+    total_consumed_qty = sum(t['returned_consumed_qty'] or 0 for t in transactions)
     total_damaged_qty = sum(t['returned_damaged_qty'] or 0 for t in transactions)
     total_missing_qty = sum(t['returned_missing_qty'] or 0 for t in transactions)
     total_pending_issues = sum(1 for t in transactions if t['status'] == 'ISSUED')
@@ -1078,6 +1079,7 @@ def transaction_report():
         total_txns=total_txns,
         total_issued_qty=total_issued_qty,
         total_good_returned=total_good_returned,
+        total_consumed_qty=total_consumed_qty,
         total_damaged_qty=total_damaged_qty,
         total_missing_qty=total_missing_qty,
         total_pending_issues=total_pending_issues,
@@ -1364,7 +1366,8 @@ def issue_component():
         cid = it['component_id']
         comp = comp_lookup[cid]
         qty = it['quantity']
-        status = 'CONSUMED' if it['is_consumable'] == 'yes' or comp['category'] == 'Consumable' else 'ISSUED'
+        # Consumable items are also tracked for return and reuse; only mark CONSUMED if explicitly chosen
+        status = 'CONSUMED' if it.get('is_consumable') == 'yes' else 'ISSUED'
 
         # 1. Deduct stock
         conn.execute('UPDATE components SET quantity = quantity - ? WHERE id = ?', (qty, cid))
@@ -1445,6 +1448,7 @@ def return_component(id):
         
     try:
         good_qty = int(request.form.get('good_qty', 0))
+        consumed_qty = int(request.form.get('consumed_qty', 0))
         damaged_qty = int(request.form.get('damaged_qty', 0))
         missing_qty = int(request.form.get('missing_qty', 0))
     except ValueError:
@@ -1453,7 +1457,7 @@ def return_component(id):
         return redirect(url_for('list_transactions'))
         
     damage_remarks = request.form.get('damage_remarks', '').strip()
-    total_accounted = good_qty + damaged_qty + missing_qty
+    total_accounted = good_qty + consumed_qty + damaged_qty + missing_qty
     
     if total_accounted != txn['quantity']:
         conn.close()
@@ -1462,6 +1466,8 @@ def return_component(id):
         
     if good_qty == txn['quantity']:
         status = 'RETURNED'
+    elif consumed_qty == txn['quantity']:
+        status = 'CONSUMED'
     elif damaged_qty == txn['quantity']:
         status = 'ALL_DAMAGED'
     elif missing_qty == txn['quantity']:
@@ -1482,12 +1488,13 @@ def return_component(id):
         UPDATE transactions
         SET status = ?,
             returned_good_qty = ?,
+            returned_consumed_qty = ?,
             returned_damaged_qty = ?,
             returned_missing_qty = ?,
             damage_remarks = ?,
             return_date = CURRENT_TIMESTAMP
         WHERE id = ?
-    ''', (status, good_qty, damaged_qty, missing_qty, damage_remarks, id))
+    ''', (status, good_qty, consumed_qty, damaged_qty, missing_qty, damage_remarks, id))
     
     conn.commit()
     
@@ -1518,7 +1525,8 @@ def return_component(id):
             missing_qty=missing_qty,
             remarks=damage_remarks,
             recipient_type=rcp_type,
-            dept=rcp_dept
+            dept=rcp_dept,
+            consumed_qty=consumed_qty
         )
         wa_url = get_whatsapp_url(rcp_phone, wa_msg)
         
@@ -1534,7 +1542,14 @@ def return_component(id):
         }
         
     conn.close()
-    flash(f'Return processed successfully! ({good_qty} Good, {damaged_qty} Damaged, {missing_qty} Missing) for {rcp_name}', 'success')
+    flash_details = [f"{good_qty} Good"]
+    if consumed_qty > 0:
+        flash_details.append(f"{consumed_qty} Consumed")
+    if damaged_qty > 0:
+        flash_details.append(f"{damaged_qty} Damaged")
+    if missing_qty > 0:
+        flash_details.append(f"{missing_qty} Missing")
+    flash(f"Return processed successfully! ({', '.join(flash_details)}) for {rcp_name}", 'success')
     return redirect(url_for('list_transactions'))
 
 

@@ -326,10 +326,14 @@ def export_transactions_to_excel(transactions_list, lab_name="All Laboratories")
         ret_date = _get('return_date', '')
         remarks = _get('damage_remarks') or _get('remarks') or ''
         
+        good = _get('returned_good_qty', 0)
+        cons = _get('returned_consumed_qty', 0)
         dmg = _get('returned_damaged_qty', 0)
         mis = _get('returned_missing_qty', 0)
-        if dmg or mis:
+        if dmg or mis or cons:
             issues = []
+            if good: issues.append(f"Good: {good}")
+            if cons: issues.append(f"Consumed: {cons}")
             if dmg: issues.append(f"Damaged: {dmg}")
             if mis: issues.append(f"Missing: {mis}")
             remarks = f"[{', '.join(issues)}] {remarks}".strip()

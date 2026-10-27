@@ -234,6 +234,13 @@
             </div>
             <div class="col">
                 <div class="stat-badge">
+                    <div class="text-muted small">Consumed Items</div>
+                    <div class="fs-5 fw-bold text-warning-emphasis">{{ total_consumed_qty }}</div>
+                    <div class="text-muted" style="font-size: 0.7rem;">Used in Practicals</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="stat-badge">
                     <div class="text-muted small">Damaged Items</div>
                     <div class="fs-5 fw-bold text-danger">{{ total_damaged_qty }}</div>
                     <div class="text-muted" style="font-size: 0.7rem;">Requires Repair/Replace</div>
@@ -321,6 +328,9 @@
                                 <div class="d-flex flex-column gap-1">
                                     {% if t.returned_good_qty > 0 %}
                                         <span class="badge bg-success">Good: {{ t.returned_good_qty }}</span>
+                                    {% endif %}
+                                    {% if t.returned_consumed_qty > 0 %}
+                                        <span class="badge bg-warning text-dark">Consumed: {{ t.returned_consumed_qty }}</span>
                                     {% endif %}
                                     {% if t.returned_damaged_qty > 0 %}
                                         <span class="badge bg-danger">Damaged: {{ t.returned_damaged_qty }}</span>

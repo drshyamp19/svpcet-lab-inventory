@@ -209,6 +209,9 @@
                                     {% if t.returned_good_qty > 0 %}
                                         <span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>Good: {{ t.returned_good_qty }}</span>
                                     {% endif %}
+                                    {% if t.returned_consumed_qty > 0 %}
+                                        <span class="badge bg-warning text-dark"><i class="fa-solid fa-fire me-1"></i>Consumed: {{ t.returned_consumed_qty }}</span>
+                                    {% endif %}
                                     {% if t.returned_damaged_qty > 0 %}
                                         <span class="badge bg-danger"><i class="fa-solid fa-burst me-1"></i>Damaged: {{ t.returned_damaged_qty }}</span>
                                     {% endif %}
@@ -490,8 +493,8 @@
                                             </td>
                                             <td>
                                                 <select name="is_consumables[]" class="form-select comp-consumable">
-                                                    <option value="no">Returnable (Hardware)</option>
-                                                    <option value="yes">Consumable (खर्च होणारे)</option>
+                                                    <option value="no" selected>Track for Return (पुन्हा जमा होणार)</option>
+                                                    <option value="yes">Immediate Consume (थेट खर्च)</option>
                                                 </select>
                                             </td>
                                             <td class="text-center">
@@ -553,29 +556,37 @@
 
                     <p class="small text-muted mb-2">Enter the condition breakdown of items returned:</p>
 
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold text-success">
+                    <div class="row g-2">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label fw-bold text-success small mb-1">
                                 <i class="fa-solid fa-circle-check me-1"></i>Good (चांगले)
                             </label>
-                            <input type="number" id="inputGoodQty" name="good_qty" class="form-control form-control-lg border-success text-center fw-bold" min="0" value="0" required>
-                            <small class="text-muted d-block text-center mt-1">Restored to Stock</small>
+                            <input type="number" id="inputGoodQty" name="good_qty" class="form-control form-control-lg border-success text-center fw-bold px-1" min="0" value="0" required>
+                            <small class="text-muted d-block text-center mt-1" style="font-size: 0.72rem;">पुन्हा स्टॉकमध्ये</small>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold text-danger">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label fw-bold text-warning-emphasis small mb-1">
+                                <i class="fa-solid fa-fire me-1 text-warning"></i>Consumed (संपले)
+                            </label>
+                            <input type="number" id="inputConsumedQty" name="consumed_qty" class="form-control form-control-lg border-warning text-center fw-bold px-1" min="0" value="0" required>
+                            <small class="text-muted d-block text-center mt-1" style="font-size: 0.72rem;">लॅबमध्ये वापरले</small>
+                        </div>
+
+                        <div class="col-6 col-md-3">
+                            <label class="form-label fw-bold text-danger small mb-1">
                                 <i class="fa-solid fa-burst me-1"></i>Damaged (खराब)
                             </label>
-                            <input type="number" id="inputDamagedQty" name="damaged_qty" class="form-control form-control-lg border-danger text-center fw-bold" min="0" value="0" required>
-                            <small class="text-muted d-block text-center mt-1">Sent to Scrap/Repair</small>
+                            <input type="number" id="inputDamagedQty" name="damaged_qty" class="form-control form-control-lg border-danger text-center fw-bold px-1" min="0" value="0" required>
+                            <small class="text-muted d-block text-center mt-1" style="font-size: 0.72rem;">स्क्रॅप / दुरुस्ती</small>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label fw-bold text-dark">
+                        <div class="col-6 col-md-3">
+                            <label class="form-label fw-bold text-dark small mb-1">
                                 <i class="fa-solid fa-circle-question me-1"></i>Missing (हरवले)
                             </label>
-                            <input type="number" id="inputMissingQty" name="missing_qty" class="form-control form-control-lg border-dark text-center fw-bold" min="0" value="0" required>
-                            <small class="text-muted d-block text-center mt-1">Accountable</small>
+                            <input type="number" id="inputMissingQty" name="missing_qty" class="form-control form-control-lg border-dark text-center fw-bold px-1" min="0" value="0" required>
+                            <small class="text-muted d-block text-center mt-1" style="font-size: 0.72rem;">गहाळ / जबाबदार</small>
                         </div>
                     </div>
 
@@ -947,9 +958,7 @@ document.addEventListener("DOMContentLoaded", function() {
                 qtyInput.value = avail;
             }
         }
-        if (cat === "Consumable" && consumableSelect) {
-            consumableSelect.value = "yes";
-        }
+        // Consumables also track for return and reuse; do not auto-force to immediate consume
 
         if (stockInfoDiv && stockAvailSpan) {
             stockInfoDiv.style.display = "block";
@@ -1130,6 +1139,7 @@ document.addEventListener("DOMContentLoaded", function() {
     var totalIssued = 0;
     var returnForm = document.getElementById("returnForm");
     var inputGood = document.getElementById("inputGoodQty");
+    var inputConsumed = document.getElementById("inputConsumedQty");
     var inputDamaged = document.getElementById("inputDamagedQty");
     var inputMissing = document.getElementById("inputMissingQty");
     var accountedSumEl = document.getElementById("accountedSum");
@@ -1153,6 +1163,7 @@ document.addEventListener("DOMContentLoaded", function() {
             document.getElementById("modalTotalQtyBadge").innerText = totalIssued + " " + unit;
 
             inputGood.value = totalIssued;
+            if (inputConsumed) inputConsumed.value = 0;
             inputDamaged.value = 0;
             inputMissing.value = 0;
 
@@ -1162,11 +1173,12 @@ document.addEventListener("DOMContentLoaded", function() {
     });
 
     function validateBreakdown() {
-        var g = parseInt(inputGood.value, 10) || 0;
-        var d = parseInt(inputDamaged.value, 10) || 0;
-        var m = parseInt(inputMissing.value, 10) || 0;
+        var g = parseInt(inputGood ? inputGood.value : 0, 10) || 0;
+        var c = parseInt(inputConsumed ? inputConsumed.value : 0, 10) || 0;
+        var d = parseInt(inputDamaged ? inputDamaged.value : 0, 10) || 0;
+        var m = parseInt(inputMissing ? inputMissing.value : 0, 10) || 0;
 
-        var sum = g + d + m;
+        var sum = g + c + d + m;
         accountedSumEl.innerText = sum;
 
         if (sum === totalIssued) {
@@ -1180,9 +1192,10 @@ document.addEventListener("DOMContentLoaded", function() {
         }
     }
 
-    inputGood.addEventListener("input", validateBreakdown);
-    inputDamaged.addEventListener("input", validateBreakdown);
-    inputMissing.addEventListener("input", validateBreakdown);
+    if (inputGood) inputGood.addEventListener("input", validateBreakdown);
+    if (inputConsumed) inputConsumed.addEventListener("input", validateBreakdown);
+    if (inputDamaged) inputDamaged.addEventListener("input", validateBreakdown);
+    if (inputMissing) inputMissing.addEventListener("input", validateBreakdown);
 });
 
 function closeWhatsAppModal() {
