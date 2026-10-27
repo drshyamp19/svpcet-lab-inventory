@@ -157,3 +157,20 @@ def get_whatsapp_url(phone, message_text):
         return ""
     encoded_text = urllib.parse.quote(message_text)
     return f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_text}"
+
+
+def get_whatsapp_business_intent_url(phone, message_text):
+    """Generate Android Intent URI specifically targeting WhatsApp Business (com.whatsapp.w4b)."""
+    clean_phone = format_phone_number(phone)
+    if not clean_phone:
+        return ""
+    encoded_text = urllib.parse.quote(message_text)
+    return f"intent://send?phone={clean_phone}&text={encoded_text}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end"
+
+def get_whatsapp_regular_intent_url(phone, message_text):
+    """Generate Android Intent URI specifically targeting Regular WhatsApp (com.whatsapp)."""
+    clean_phone = format_phone_number(phone)
+    if not clean_phone:
+        return ""
+    encoded_text = urllib.parse.quote(message_text)
+    return f"intent://send?phone={clean_phone}&text={encoded_text}#Intent;package=com.whatsapp;scheme=whatsapp;end"

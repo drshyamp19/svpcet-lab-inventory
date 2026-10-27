@@ -243,21 +243,57 @@
                                 {% if t.display_phone %}
                                     {% if t.status == 'ISSUED' %}
                                         {% if t.expected_return_date and t.expected_return_date < today_str %}
-                                            <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ ('SVPCET IIoT LAB: Urgent reminder! Equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ ') issued to you was DUE on ' ~ t.expected_return_date ~ '. Please return to the lab immediately.') | urlencode }}"
-                                               target="_blank" class="btn btn-sm btn-danger text-white shadow-sm" title="Send Urgent Overdue Reminder via WhatsApp">
-                                                <i class="fa-brands fa-whatsapp me-1"></i> Remind
-                                            </a>
+                                            {% set wa_remind_text = ('SVPCET IIoT LAB: Urgent reminder! Equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ ') issued to you was DUE on ' ~ t.expected_return_date ~ '. Please return to the lab immediately.') %}
+                                            <div class="btn-group btn-group-sm shadow-sm">
+                                                <button type="button" class="btn btn-sm btn-danger text-white fw-semibold"
+                                                        onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'business')"
+                                                        title="WhatsApp Business वरून Urgent Reminder पाठवा">
+                                                    <i class="fa-brands fa-whatsapp me-1"></i> Remind
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-danger dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <span class="visually-hidden">Toggle</span>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow small">
+                                                    <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'business')"><i class="fa-brands fa-whatsapp text-success me-2"></i> WhatsApp Business</a></li>
+                                                    <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'regular')"><i class="fa-brands fa-whatsapp text-secondary me-2"></i> Regular WhatsApp</a></li>
+                                                    <li><a class="dropdown-item py-1" href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_remind_text | urlencode }}" target="_blank"><i class="fa-solid fa-desktop text-muted me-2"></i> WhatsApp Web</a></li>
+                                                </ul>
+                                            </div>
                                         {% else %}
-                                            <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ ('SVPCET IIoT LAB: Reminder for issued equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ '). Please return on or before ' ~ (t.expected_return_date or 'due date') ~ '.') | urlencode }}"
-                                               target="_blank" class="btn btn-sm btn-outline-success" title="Send WhatsApp Reminder">
-                                                <i class="fa-brands fa-whatsapp"></i>
-                                            </a>
+                                            {% set wa_remind_text = ('SVPCET IIoT LAB: Reminder for issued equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ '). Please return on or before ' ~ (t.expected_return_date or 'due date') ~ '.') %}
+                                            <div class="btn-group btn-group-sm">
+                                                <button type="button" class="btn btn-sm btn-outline-success"
+                                                        onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'business')"
+                                                        title="WhatsApp Business वरून पाठवा">
+                                                    <i class="fa-brands fa-whatsapp"></i>
+                                                </button>
+                                                <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                                                    <span class="visually-hidden">Toggle</span>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end shadow small">
+                                                    <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'business')"><i class="fa-brands fa-whatsapp text-success me-2"></i> WhatsApp Business</a></li>
+                                                    <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'regular')"><i class="fa-brands fa-whatsapp text-secondary me-2"></i> Regular WhatsApp</a></li>
+                                                    <li><a class="dropdown-item py-1" href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_remind_text | urlencode }}" target="_blank"><i class="fa-solid fa-desktop text-muted me-2"></i> WhatsApp Web</a></li>
+                                                </ul>
+                                            </div>
                                         {% endif %}
                                     {% else %}
-                                        <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ ('SVPCET IIoT LAB: Receipt for returned equipment ' ~ t.component_name ~ '. Thank you!') | urlencode }}"
-                                           target="_blank" class="btn btn-sm btn-outline-secondary" title="Send WhatsApp Receipt">
-                                            <i class="fa-brands fa-whatsapp"></i>
-                                        </a>
+                                        {% set wa_ret_text = ('SVPCET IIoT LAB: Receipt for returned equipment ' ~ t.component_name ~ '. Thank you!') %}
+                                        <div class="btn-group btn-group-sm">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                    onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_ret_text | urlencode }}', 'business')"
+                                                    title="WhatsApp Business वरून पावती पाठवा">
+                                                <i class="fa-brands fa-whatsapp"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
+                                                <span class="visually-hidden">Toggle</span>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow small">
+                                                <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_ret_text | urlencode }}', 'business')"><i class="fa-brands fa-whatsapp text-success me-2"></i> WhatsApp Business</a></li>
+                                                <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_ret_text | urlencode }}', 'regular')"><i class="fa-brands fa-whatsapp text-secondary me-2"></i> Regular WhatsApp</a></li>
+                                                <li><a class="dropdown-item py-1" href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_ret_text | urlencode }}" target="_blank"><i class="fa-solid fa-desktop text-muted me-2"></i> WhatsApp Web</a></li>
+                                            </ul>
+                                        </div>
                                     {% endif %}
                                 {% endif %}
                             </div>
@@ -640,11 +676,33 @@
                     <pre class="mb-0 text-dark" style="white-space: pre-wrap; font-family: inherit; font-size: 0.9rem;">{{ whatsapp_popup.message_text }}</pre>
                 </div>
 
-                <p class="text-muted small mb-4">Click below to open WhatsApp Web or App and send this receipt:</p>
+                <p class="text-muted small mb-3 fw-semibold">पावती पाठवण्यासाठी खालीलपैकी तुमचे व्हॉट्सॲप निवडा:</p>
 
-                <a href="{{ whatsapp_popup.url }}" target="_blank" class="btn btn-success btn-lg w-100 shadow py-3 fw-bold rounded-pill" onclick="closeWhatsAppModal()">
-                    <i class="fa-brands fa-whatsapp fa-xl me-2"></i> Send WhatsApp Receipt Now
-                </a>
+                <div class="d-grid gap-2 mb-3">
+                    <!-- Button 1: WhatsApp Business (Primary) -->
+                    <button type="button" 
+                            class="btn btn-lg shadow py-3 fw-bold rounded-pill text-white d-flex align-items-center justify-content-center"
+                            style="background-color: #075e54; border-color: #075e54;"
+                            onclick="triggerWhatsAppChoice('business')">
+                        <i class="fa-brands fa-whatsapp fa-2xl me-2"></i>
+                        <span>🏢 WhatsApp Business वरून पाठवा</span>
+                    </button>
+
+                    <!-- Button 2: Regular WhatsApp -->
+                    <button type="button" 
+                            class="btn btn-outline-success btn-lg py-2 fw-semibold rounded-pill d-flex align-items-center justify-content-center"
+                            onclick="triggerWhatsAppChoice('regular')">
+                        <i class="fa-brands fa-whatsapp fa-xl me-2"></i>
+                        <span>💬 Regular WhatsApp वरून पाठवा</span>
+                    </button>
+
+                    <!-- Option 3: Universal Web / PC link -->
+                    <a href="{{ whatsapp_popup.url }}" target="_blank" 
+                       class="text-decoration-none small text-muted text-center mt-1"
+                       onclick="closeWhatsAppModal()">
+                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> किंवा WhatsApp Web / PC वरून उघडा
+                    </a>
+                </div>
             </div>
             <div class="modal-footer bg-light py-2">
                 <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-bs-dismiss="modal">Close</button>
@@ -1197,6 +1255,37 @@ document.addEventListener("DOMContentLoaded", function() {
     if (inputDamaged) inputDamaged.addEventListener("input", validateBreakdown);
     if (inputMissing) inputMissing.addEventListener("input", validateBreakdown);
 });
+
+function triggerWhatsAppChoice(type) {
+    var isAndroid = /Android/i.test(navigator.userAgent);
+    var cleanPhone = "{{ whatsapp_popup.clean_phone if whatsapp_popup else '' }}";
+    var encodedText = `{{ whatsapp_popup.encoded_text if whatsapp_popup else '' }}`;
+    var webUrl = "{{ whatsapp_popup.url if whatsapp_popup else '' }}";
+
+    if (isAndroid) {
+        var pkg = (type === 'business') ? 'com.whatsapp.w4b' : 'com.whatsapp';
+        var intentUrl = "intent://send?phone=" + cleanPhone + "&text=" + encodedText + "#Intent;package=" + pkg + ";scheme=whatsapp;end";
+        window.location.href = intentUrl;
+    } else {
+        window.open(webUrl, "_blank");
+    }
+    closeWhatsAppModal();
+}
+
+function openRowWhatsApp(phone, encodedText, appType) {
+    var isAndroid = /Android/i.test(navigator.userAgent);
+    var clean = (phone || '').replace(/\D/g, '');
+    if (clean.length === 10) clean = '91' + clean;
+
+    if (isAndroid) {
+        var pkg = (appType === 'business') ? 'com.whatsapp.w4b' : 'com.whatsapp';
+        var intentUrl = "intent://send?phone=" + clean + "&text=" + encodedText + "#Intent;package=" + pkg + ";scheme=whatsapp;end";
+        window.location.href = intentUrl;
+    } else {
+        var webUrl = "https://api.whatsapp.com/send?phone=" + clean + "&text=" + encodedText;
+        window.open(webUrl, "_blank");
+    }
+}
 
 function closeWhatsAppModal() {
     var waModalEl = document.getElementById("whatsappReceiptModal");

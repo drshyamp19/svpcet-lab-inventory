@@ -20,12 +20,15 @@ from excel_handler import (
     parse_students_file,
     export_transactions_to_excel
 )
+import urllib.parse
 from whatsapp_service import (
     generate_issue_whatsapp_message,
     generate_batch_issue_whatsapp_message,
     generate_return_whatsapp_message,
     generate_overdue_reminder_whatsapp_message,
     get_whatsapp_url,
+    get_whatsapp_business_intent_url,
+    get_whatsapp_regular_intent_url,
     format_phone_number
 )
 
@@ -1415,9 +1418,13 @@ def issue_component():
         'type': f'{recipient_type.title()} Issue Receipt',
         'student_name': recipient_name,
         'phone': final_phone,
+        'clean_phone': format_phone_number(final_phone),
         'component_name': items_display_str,
         'quantity': f"{len(issued_items_summary)} item(s) total",
         'url': wa_url,
+        'business_intent_url': get_whatsapp_business_intent_url(final_phone, wa_msg),
+        'regular_intent_url': get_whatsapp_regular_intent_url(final_phone, wa_msg),
+        'encoded_text': urllib.parse.quote(wa_msg),
         'message_text': wa_msg
     }
 
@@ -1535,9 +1542,13 @@ def return_component(id):
             'type': f'{rcp_type.title()} Return Receipt',
             'student_name': rcp_name,
             'phone': rcp_phone,
+            'clean_phone': format_phone_number(rcp_phone),
             'component_name': comp['name'],
             'quantity': f"{txn['quantity']} {comp['unit']}",
             'url': wa_url,
+            'business_intent_url': get_whatsapp_business_intent_url(rcp_phone, wa_msg),
+            'regular_intent_url': get_whatsapp_regular_intent_url(rcp_phone, wa_msg),
+            'encoded_text': urllib.parse.quote(wa_msg),
             'message_text': wa_msg
         }
         
