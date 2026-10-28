@@ -36,6 +36,7 @@ from whatsapp_service import (
     get_whatsapp_url,
     get_whatsapp_business_intent_url,
     get_whatsapp_regular_intent_url,
+    get_whatsapp_native_url,
     format_phone_number
 )
 
@@ -1432,6 +1433,7 @@ def issue_component():
         'url': wa_url,
         'business_intent_url': get_whatsapp_business_intent_url(final_phone, wa_msg),
         'regular_intent_url': get_whatsapp_regular_intent_url(final_phone, wa_msg),
+        'native_url': get_whatsapp_native_url(final_phone, wa_msg),
         'encoded_text': urllib.parse.quote(wa_msg),
         'message_text': wa_msg
     }
@@ -1557,6 +1559,7 @@ def return_component(id):
             'url': wa_url,
             'business_intent_url': get_whatsapp_business_intent_url(rcp_phone, wa_msg),
             'regular_intent_url': get_whatsapp_regular_intent_url(rcp_phone, wa_msg),
+            'native_url': get_whatsapp_native_url(rcp_phone, wa_msg),
             'encoded_text': urllib.parse.quote(wa_msg),
             'message_text': wa_msg
         }

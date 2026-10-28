@@ -670,38 +670,62 @@
                 </div>
 
                 <div class="card bg-light border-0 p-3 text-start small mb-3 rounded-3" style="border-left: 4px solid #25D366 !important;">
-                    <div class="fw-bold text-success mb-1">
-                        <i class="fa-solid fa-receipt me-1"></i> WhatsApp Message Preview:
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold text-success">
+                            <i class="fa-solid fa-receipt me-1"></i> WhatsApp Message Preview:
+                        </span>
+                        <button type="button" class="btn btn-sm btn-outline-success py-0 px-2 fw-semibold" onclick="copyWhatsAppReceiptText()">
+                            <i class="fa-solid fa-copy me-1"></i> Copy
+                        </button>
                     </div>
-                    <pre class="mb-0 text-dark" style="white-space: pre-wrap; font-family: inherit; font-size: 0.9rem;">{{ whatsapp_popup.message_text }}</pre>
+                    <pre id="waMessagePreviewText" class="mb-0 text-dark" style="white-space: pre-wrap; font-family: inherit; font-size: 0.9rem;">{{ whatsapp_popup.message_text }}</pre>
                 </div>
 
-                <p class="text-muted small mb-3 fw-semibold">पावती पाठवण्यासाठी खालीलपैकी तुमचे व्हॉट्सॲप निवडा:</p>
+                <p class="text-muted small mb-2 fw-semibold">पावती पाठवण्यासाठी खालीलपैकी पर्याय निवडा:</p>
 
                 <div class="d-grid gap-2 mb-3">
-                    <!-- Button 1: WhatsApp Business (Primary) -->
-                    <button type="button" 
-                            class="btn btn-lg shadow py-3 fw-bold rounded-pill text-white d-flex align-items-center justify-content-center"
-                            style="background-color: #075e54; border-color: #075e54;"
-                            onclick="triggerWhatsAppChoice('business')">
+                    <!-- Option 1: WhatsApp Business (Direct Deep Link) -->
+                    <a href="{{ whatsapp_popup.business_intent_url }}" 
+                       id="btnWaBusiness"
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       class="btn btn-lg shadow py-3 fw-bold rounded-pill text-white d-flex align-items-center justify-content-center"
+                       style="background-color: #075e54; border-color: #075e54;"
+                       onclick="handleWaClick(event, 'business')">
                         <i class="fa-brands fa-whatsapp fa-2xl me-2"></i>
                         <span>🏢 WhatsApp Business वरून पाठवा</span>
-                    </button>
+                    </a>
 
-                    <!-- Button 2: Regular WhatsApp -->
-                    <button type="button" 
-                            class="btn btn-outline-success btn-lg py-2 fw-semibold rounded-pill d-flex align-items-center justify-content-center"
-                            onclick="triggerWhatsAppChoice('regular')">
+                    <!-- Option 2: Regular WhatsApp (Direct Deep Link) -->
+                    <a href="{{ whatsapp_popup.regular_intent_url }}" 
+                       id="btnWaRegular"
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       class="btn btn-outline-success btn-lg py-2 fw-semibold rounded-pill d-flex align-items-center justify-content-center"
+                       onclick="handleWaClick(event, 'regular')">
                         <i class="fa-brands fa-whatsapp fa-xl me-2"></i>
                         <span>💬 Regular WhatsApp वरून पाठवा</span>
-                    </button>
-
-                    <!-- Option 3: Universal Web / PC link -->
-                    <a href="{{ whatsapp_popup.url }}" target="_blank" 
-                       class="text-decoration-none small text-muted text-center mt-1"
-                       onclick="closeWhatsAppModal()">
-                        <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> किंवा WhatsApp Web / PC वरून उघडा
                     </a>
+
+                    <!-- Option 3: Universal Browser / App Link (wa.me) -->
+                    <a href="{{ whatsapp_popup.url }}" 
+                       id="btnWaUniversal"
+                       target="_blank" 
+                       rel="noopener noreferrer"
+                       class="btn btn-light border py-2 fw-semibold rounded-pill text-dark d-flex align-items-center justify-content-center shadow-sm"
+                       onclick="closeWhatsAppModal()">
+                        <i class="fa-solid fa-globe text-primary me-2"></i>
+                        <span>🌐 कोणत्याही ब्राउझर किंवा ॲपवरून उघडा (Universal)</span>
+                    </a>
+
+                    <!-- Option 4: 1-Tap Copy Message to Clipboard -->
+                    <button type="button" 
+                            id="btnWaCopy"
+                            class="btn btn-outline-secondary py-2 rounded-pill fw-semibold d-flex align-items-center justify-content-center"
+                            onclick="copyWhatsAppReceiptText()">
+                        <i class="fa-solid fa-clipboard-check me-2 text-success"></i>
+                        <span id="copyBtnStatus">📋 पावती मेसेज कॉपी करा (Copy Receipt)</span>
+                    </button>
                 </div>
             </div>
             <div class="modal-footer bg-light py-2">
@@ -1294,34 +1318,85 @@ document.addEventListener("DOMContentLoaded", function() {
     if (inputMissing) inputMissing.addEventListener("input", validateBreakdown);
 });
 
-function triggerWhatsAppChoice(type) {
+function handleWaClick(e, type) {
     var isAndroid = /Android/i.test(navigator.userAgent);
-    var cleanPhone = "{{ whatsapp_popup.clean_phone if whatsapp_popup else '' }}";
-    var encodedText = `{{ whatsapp_popup.encoded_text if whatsapp_popup else '' }}`;
     var webUrl = "{{ whatsapp_popup.url if whatsapp_popup else '' }}";
 
-    if (isAndroid) {
-        var pkg = (type === 'business') ? 'com.whatsapp.w4b' : 'com.whatsapp';
-        var intentUrl = "intent://send?phone=" + cleanPhone + "&text=" + encodedText + "#Intent;package=" + pkg + ";scheme=whatsapp;end";
-        window.location.href = intentUrl;
-    } else {
+    if (!isAndroid) {
+        // On Desktop / Mac / iOS: intent:// does not resolve, so open universal webUrl
+        e.preventDefault();
         window.open(webUrl, "_blank");
     }
     closeWhatsAppModal();
 }
 
 function openRowWhatsApp(phone, encodedText, appType) {
-    var isAndroid = /Android/i.test(navigator.userAgent);
     var clean = (phone || '').replace(/\D/g, '');
     if (clean.length === 10) clean = '91' + clean;
+    var webUrl = "https://api.whatsapp.com/send?phone=" + clean + "&text=" + encodedText;
+    var isAndroid = /Android/i.test(navigator.userAgent);
 
     if (isAndroid) {
         var pkg = (appType === 'business') ? 'com.whatsapp.w4b' : 'com.whatsapp';
-        var intentUrl = "intent://send?phone=" + clean + "&text=" + encodedText + "#Intent;package=" + pkg + ";scheme=whatsapp;end";
-        window.location.href = intentUrl;
+        var fallbackEncoded = encodeURIComponent(webUrl);
+        var intentUrl = "intent://api.whatsapp.com/send?phone=" + clean + "&text=" + encodedText + "#Intent;scheme=https;package=" + pkg + ";S.browser_fallback_url=" + fallbackEncoded + ";end";
+        
+        try {
+            var link = document.createElement('a');
+            link.href = intentUrl;
+            link.target = '_blank';
+            link.rel = 'noopener noreferrer';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } catch(err) {
+            window.open(webUrl, "_blank");
+        }
     } else {
-        var webUrl = "https://api.whatsapp.com/send?phone=" + clean + "&text=" + encodedText;
         window.open(webUrl, "_blank");
+    }
+}
+
+function copyWhatsAppReceiptText() {
+    var previewEl = document.getElementById("waMessagePreviewText");
+    if (!previewEl) return;
+    var text = previewEl.innerText || previewEl.textContent;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            setCopyFeedback();
+        }).catch(function() {
+            fallbackCopyText(text);
+        });
+    } else {
+        fallbackCopyText(text);
+    }
+}
+
+function fallbackCopyText(text) {
+    var t = document.createElement("textarea");
+    t.value = text;
+    t.style.position = "fixed";
+    t.style.top = "-9999px";
+    t.style.left = "-9999px";
+    document.body.appendChild(t);
+    t.focus();
+    t.select();
+    try {
+        document.execCommand("copy");
+        setCopyFeedback();
+    } catch(err) {
+        alert("मेसेज कॉपी करण्यासाठी कृपया वरील मजकूर सिलेक्ट करून कॉपी करा.");
+    }
+    document.body.removeChild(t);
+}
+
+function setCopyFeedback() {
+    var label = document.getElementById("copyBtnStatus");
+    if (label) {
+        var old = label.innerHTML;
+        label.innerHTML = "✅ पावती कॉपी झाली! (Copied to Clipboard)";
+        setTimeout(function() { label.innerHTML = old; }, 3000);
     }
 }
 
@@ -1330,7 +1405,7 @@ function closeWhatsAppModal() {
     if (waModalEl) {
         var modal = bootstrap.Modal.getInstance(waModalEl);
         if (modal) {
-            setTimeout(function() { modal.hide(); }, 600);
+            setTimeout(function() { modal.hide(); }, 800);
         }
     }
 }

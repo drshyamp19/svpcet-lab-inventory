@@ -172,7 +172,8 @@ def get_whatsapp_business_intent_url(phone, message_text):
     if not clean_phone:
         return ""
     encoded_text = urllib.parse.quote(message_text)
-    return f"intent://send?phone={clean_phone}&text={encoded_text}#Intent;package=com.whatsapp.w4b;scheme=whatsapp;end"
+    fallback_url = urllib.parse.quote(f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_text}", safe='')
+    return f"intent://api.whatsapp.com/send?phone={clean_phone}&text={encoded_text}#Intent;scheme=https;package=com.whatsapp.w4b;S.browser_fallback_url={fallback_url};end"
 
 def get_whatsapp_regular_intent_url(phone, message_text):
     """Generate Android Intent URI specifically targeting Regular WhatsApp (com.whatsapp)."""
@@ -180,4 +181,13 @@ def get_whatsapp_regular_intent_url(phone, message_text):
     if not clean_phone:
         return ""
     encoded_text = urllib.parse.quote(message_text)
-    return f"intent://send?phone={clean_phone}&text={encoded_text}#Intent;package=com.whatsapp;scheme=whatsapp;end"
+    fallback_url = urllib.parse.quote(f"https://api.whatsapp.com/send?phone={clean_phone}&text={encoded_text}", safe='')
+    return f"intent://api.whatsapp.com/send?phone={clean_phone}&text={encoded_text}#Intent;scheme=https;package=com.whatsapp;S.browser_fallback_url={fallback_url};end"
+
+def get_whatsapp_native_url(phone, message_text):
+    """Generate native whatsapp:// deep link URL."""
+    clean_phone = format_phone_number(phone)
+    if not clean_phone:
+        return ""
+    encoded_text = urllib.parse.quote(message_text)
+    return f"whatsapp://send?phone={clean_phone}&text={encoded_text}"
