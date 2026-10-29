@@ -244,55 +244,55 @@
                                     {% if t.status == 'ISSUED' %}
                                         {% if t.expected_return_date and t.expected_return_date < today_str %}
                                             {% set wa_remind_text = ('SVPCET IIoT LAB: Urgent reminder! Equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ ') issued to you was DUE on ' ~ t.expected_return_date ~ '. Please return to the lab immediately.') %}
-                                            <div class="btn-group btn-group-sm shadow-sm">
-                                                <button type="button" class="btn btn-sm btn-danger text-white fw-semibold"
-                                                        onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'business')"
-                                                        title="WhatsApp Business वरून Urgent Reminder पाठवा">
+                                            <div class="d-inline-flex gap-1 shadow-sm">
+                                                <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_remind_text | urlencode }}"
+                                                   target="_blank"
+                                                   rel="noopener noreferrer"
+                                                   class="btn btn-sm btn-danger text-white fw-semibold"
+                                                   title="Send WhatsApp Reminder">
                                                     <i class="fa-brands fa-whatsapp me-1"></i> Remind
+                                                </a>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-danger btn-share-row"
+                                                        data-share-text="{{ wa_remind_text }}"
+                                                        title="Share to WhatsApp Business / Other Apps">
+                                                    <i class="fa-solid fa-share-nodes"></i>
                                                 </button>
-                                                <button type="button" class="btn btn-sm btn-danger dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <span class="visually-hidden">Toggle</span>
-                                                </button>
-                                                <ul class="dropdown-menu dropdown-menu-end shadow small">
-                                                    <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'business')"><i class="fa-brands fa-whatsapp text-success me-2"></i> WhatsApp Business</a></li>
-                                                    <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'regular')"><i class="fa-brands fa-whatsapp text-secondary me-2"></i> Regular WhatsApp</a></li>
-                                                    <li><a class="dropdown-item py-1" href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_remind_text | urlencode }}" target="_blank"><i class="fa-solid fa-desktop text-muted me-2"></i> WhatsApp Web</a></li>
-                                                </ul>
                                             </div>
                                         {% else %}
                                             {% set wa_remind_text = ('SVPCET IIoT LAB: Reminder for issued equipment ' ~ t.component_name ~ ' (' ~ t.quantity ~ ' ' ~ t.unit ~ '). Please return on or before ' ~ (t.expected_return_date or 'due date') ~ '.') %}
-                                            <div class="btn-group btn-group-sm">
-                                                <button type="button" class="btn btn-sm btn-outline-success"
-                                                        onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'business')"
-                                                        title="WhatsApp Business वरून पाठवा">
+                                            <div class="d-inline-flex gap-1">
+                                                <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_remind_text | urlencode }}"
+                                                   target="_blank"
+                                                   rel="noopener noreferrer"
+                                                   class="btn btn-sm btn-outline-success"
+                                                   title="Send WhatsApp Message">
                                                     <i class="fa-brands fa-whatsapp"></i>
+                                                </a>
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-primary btn-share-row"
+                                                        data-share-text="{{ wa_remind_text }}"
+                                                        title="Share to WhatsApp Business / Other Apps">
+                                                    <i class="fa-solid fa-share-nodes"></i>
                                                 </button>
-                                                <button type="button" class="btn btn-sm btn-outline-success dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                                                    <span class="visually-hidden">Toggle</span>
-                                                </button>
-                                                <ul class="dropdown-menu dropdown-menu-end shadow small">
-                                                    <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'business')"><i class="fa-brands fa-whatsapp text-success me-2"></i> WhatsApp Business</a></li>
-                                                    <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_remind_text | urlencode }}', 'regular')"><i class="fa-brands fa-whatsapp text-secondary me-2"></i> Regular WhatsApp</a></li>
-                                                    <li><a class="dropdown-item py-1" href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_remind_text | urlencode }}" target="_blank"><i class="fa-solid fa-desktop text-muted me-2"></i> WhatsApp Web</a></li>
-                                                </ul>
                                             </div>
                                         {% endif %}
                                     {% else %}
                                         {% set wa_ret_text = ('SVPCET IIoT LAB: Receipt for returned equipment ' ~ t.component_name ~ '. Thank you!') %}
-                                        <div class="btn-group btn-group-sm">
-                                            <button type="button" class="btn btn-sm btn-outline-secondary"
-                                                    onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_ret_text | urlencode }}', 'business')"
-                                                    title="WhatsApp Business वरून पावती पाठवा">
+                                        <div class="d-inline-flex gap-1">
+                                            <a href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_ret_text | urlencode }}"
+                                               target="_blank"
+                                               rel="noopener noreferrer"
+                                               class="btn btn-sm btn-outline-secondary"
+                                               title="Send WhatsApp Receipt">
                                                 <i class="fa-brands fa-whatsapp"></i>
+                                            </a>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-primary btn-share-row"
+                                                    data-share-text="{{ wa_ret_text }}"
+                                                    title="Share to WhatsApp Business / Other Apps">
+                                                <i class="fa-solid fa-share-nodes"></i>
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle dropdown-toggle-split" data-bs-toggle="dropdown" aria-expanded="false">
-                                                <span class="visually-hidden">Toggle</span>
-                                            </button>
-                                            <ul class="dropdown-menu dropdown-menu-end shadow small">
-                                                <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_ret_text | urlencode }}', 'business')"><i class="fa-brands fa-whatsapp text-success me-2"></i> WhatsApp Business</a></li>
-                                                <li><a class="dropdown-item py-1" href="javascript:void(0)" onclick="openRowWhatsApp('91{{ t.display_phone[-10:] }}', '{{ wa_ret_text | urlencode }}', 'regular')"><i class="fa-brands fa-whatsapp text-secondary me-2"></i> Regular WhatsApp</a></li>
-                                                <li><a class="dropdown-item py-1" href="https://api.whatsapp.com/send?phone=91{{ t.display_phone[-10:] }}&text={{ wa_ret_text | urlencode }}" target="_blank"><i class="fa-solid fa-desktop text-muted me-2"></i> WhatsApp Web</a></li>
-                                            </ul>
                                         </div>
                                     {% endif %}
                                 {% endif %}
@@ -681,44 +681,31 @@
                     <pre id="waMessagePreviewText" class="mb-0 text-dark" style="white-space: pre-wrap; font-family: inherit; font-size: 0.9rem;">{{ whatsapp_popup.message_text }}</pre>
                 </div>
 
-                <p class="text-muted small mb-2 fw-semibold">पावती पाठवण्यासाठी खालीलपैकी पर्याय निवडा:</p>
+                <p class="text-muted small mb-2 fw-semibold">पावती पाठवण्यासाठी खालीलपैकी पर्याय वापरा:</p>
 
-                <div class="d-grid gap-2 mb-3">
-                    <!-- Option 1: WhatsApp Business (Direct Deep Link) -->
-                    <a href="{{ whatsapp_popup.business_intent_url }}" 
-                       id="btnWaBusiness"
+                <div class="d-grid gap-3 mb-3">
+                    <!-- Button 1: Direct WhatsApp -->
+                    <a href="{{ whatsapp_popup.url }}" 
+                       id="btnDirectWa"
                        target="_blank" 
                        rel="noopener noreferrer"
                        class="btn btn-lg shadow py-3 fw-bold rounded-pill text-white d-flex align-items-center justify-content-center"
-                       style="background-color: #075e54; border-color: #075e54;"
-                       onclick="handleWaClick(event, 'business')">
-                        <i class="fa-brands fa-whatsapp fa-2xl me-2"></i>
-                        <span>🏢 WhatsApp Business वरून पाठवा</span>
-                    </a>
-
-                    <!-- Option 2: Regular WhatsApp (Direct Deep Link) -->
-                    <a href="{{ whatsapp_popup.regular_intent_url }}" 
-                       id="btnWaRegular"
-                       target="_blank" 
-                       rel="noopener noreferrer"
-                       class="btn btn-outline-success btn-lg py-2 fw-semibold rounded-pill d-flex align-items-center justify-content-center"
-                       onclick="handleWaClick(event, 'regular')">
-                        <i class="fa-brands fa-whatsapp fa-xl me-2"></i>
-                        <span>💬 Regular WhatsApp वरून पाठवा</span>
-                    </a>
-
-                    <!-- Option 3: Universal Browser / App Link (wa.me) -->
-                    <a href="{{ whatsapp_popup.url }}" 
-                       id="btnWaUniversal"
-                       target="_blank" 
-                       rel="noopener noreferrer"
-                       class="btn btn-light border py-2 fw-semibold rounded-pill text-dark d-flex align-items-center justify-content-center shadow-sm"
+                       style="background-color: #25D366; border-color: #25D366;"
                        onclick="closeWhatsAppModal()">
-                        <i class="fa-solid fa-globe text-primary me-2"></i>
-                        <span>🌐 कोणत्याही ब्राउझर किंवा ॲपवरून उघडा (Universal)</span>
+                        <i class="fa-brands fa-whatsapp fa-2xl me-2"></i>
+                        <span class="fs-5">💬 WhatsApp वर पाठवा (Direct)</span>
                     </a>
 
-                    <!-- Option 4: 1-Tap Copy Message to Clipboard -->
+                    <!-- Button 2: Native Android Share (WhatsApp Business / Any App) -->
+                    <button type="button" 
+                            id="btnShareApp"
+                            class="btn btn-primary btn-lg shadow py-3 fw-bold rounded-pill text-white d-flex align-items-center justify-content-center"
+                            onclick="shareReceiptMessage()">
+                        <i class="fa-solid fa-share-nodes fa-2xl me-2"></i>
+                        <span class="fs-5">📲 इतर ॲप्सवर शेअर करा (Share to Any App)</span>
+                    </button>
+
+                    <!-- Button 3: 1-Tap Copy Message -->
                     <button type="button" 
                             id="btnWaCopy"
                             class="btn btn-outline-secondary py-2 rounded-pill fw-semibold d-flex align-items-center justify-content-center"
@@ -1318,44 +1305,65 @@ document.addEventListener("DOMContentLoaded", function() {
     if (inputMissing) inputMissing.addEventListener("input", validateBreakdown);
 });
 
-function handleWaClick(e, type) {
-    var isAndroid = /Android/i.test(navigator.userAgent);
-    var webUrl = "{{ whatsapp_popup.url if whatsapp_popup else '' }}";
+function shareCustomText(text, title) {
+    title = title || "SVPCET Lab Notification";
+    if (!text) return;
 
-    if (!isAndroid) {
-        // On Desktop / Mac / iOS: intent:// does not resolve, so open universal webUrl
-        e.preventDefault();
-        window.open(webUrl, "_blank");
+    // 1. Web Share API (native Android share sheet: WhatsApp, WhatsApp Business, Gmail, SMS, etc.)
+    if (navigator.share) {
+        navigator.share({
+            title: title,
+            text: text
+        }).catch(function(err) {
+            console.log("Share dismissed or error:", err);
+        });
+        return;
     }
-    closeWhatsAppModal();
-}
 
-function openRowWhatsApp(phone, encodedText, appType) {
-    var clean = (phone || '').replace(/\D/g, '');
-    if (clean.length === 10) clean = '91' + clean;
-    var webUrl = "https://api.whatsapp.com/send?phone=" + clean + "&text=" + encodedText;
+    // 2. Android Intent ACTION_SEND (for mobile WebViews & AppsGeyser APK)
     var isAndroid = /Android/i.test(navigator.userAgent);
-
     if (isAndroid) {
-        var pkg = (appType === 'business') ? 'com.whatsapp.w4b' : 'com.whatsapp';
-        var fallbackEncoded = encodeURIComponent(webUrl);
-        var intentUrl = "intent://api.whatsapp.com/send?phone=" + clean + "&text=" + encodedText + "#Intent;scheme=https;package=" + pkg + ";S.browser_fallback_url=" + fallbackEncoded + ";end";
-        
         try {
-            var link = document.createElement('a');
+            var intentUrl = "intent:#Intent;action=android.intent.action.SEND;type=text/plain;S.android.intent.extra.TEXT=" + encodeURIComponent(text) + ";end";
+            var link = document.createElement("a");
             link.href = intentUrl;
-            link.target = '_blank';
-            link.rel = 'noopener noreferrer';
+            link.target = "_blank";
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-        } catch(err) {
-            window.open(webUrl, "_blank");
+            return;
+        } catch(e) {
+            console.log("Intent share fallback:", e);
         }
+    }
+
+    // 3. Fallback: Copy to clipboard and alert
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function() {
+            alert("पावती मेसेज कॉपी झाला आहे! आता तुम्ही कोणत्याही ॲपमध्ये जाऊन तो पेस्ट (Paste) करू शकता.");
+        });
     } else {
-        window.open(webUrl, "_blank");
+        fallbackCopyText(text);
+        alert("पावती मेसेज कॉपी झाला आहे! आता तुम्ही कोणत्याही ॲपमध्ये जाऊन तो पेस्ट (Paste) करू शकता.");
     }
 }
+
+function shareReceiptMessage() {
+    var previewEl = document.getElementById("waMessagePreviewText");
+    var text = previewEl ? (previewEl.innerText || previewEl.textContent) : "";
+    var studentName = "{{ whatsapp_popup.student_name if whatsapp_popup else '' }}";
+    shareCustomText(text, "SVPCET Lab Receipt - " + studentName);
+    closeWhatsAppModal();
+}
+
+// Table row share button listener (delegation)
+document.addEventListener("click", function(e) {
+    var btn = e.target.closest(".btn-share-row");
+    if (btn) {
+        var text = btn.getAttribute("data-share-text") || "";
+        shareCustomText(text, "SVPCET Lab Receipt");
+    }
+});
 
 function copyWhatsAppReceiptText() {
     var previewEl = document.getElementById("waMessagePreviewText");
